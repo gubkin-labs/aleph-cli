@@ -1,0 +1,9 @@
+.aleph
+.github
+.husky
+openapi
+release
+scripts
+src
+tests
+*.tsbuildinfo
