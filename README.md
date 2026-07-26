@@ -4,9 +4,9 @@ Publish and manage [Aleph](https://www.aleph-agent.com) agents from a terminal
 or CI workflow.
 
 ```bash
-npx @aleph-agent/cli login
-npx @aleph-agent/cli agents push ./my-agent
-ALEPH_API_KEY=... npx @aleph-agent/cli agents sync . --json
+npx @gubkin-labs/aleph-cli login
+npx @gubkin-labs/aleph-cli agents push ./my-agent
+ALEPH_API_KEY=... npx @gubkin-labs/aleph-cli agents sync . --json
 ```
 
 Global installation and the standalone release binaries expose the same
@@ -64,7 +64,7 @@ The application API client is generated from Aleph’s `/doc` OpenAPI document.
 Every push to `main` runs the release workflow after the full quality suite.
 semantic-release publishes at least a patch release for every push; conventional
 `feat` and breaking commits still select minor and major versions. The workflow
-publishes `@aleph-agent/cli` to npm and creates the matching GitHub release.
+publishes `@gubkin-labs/aleph-cli` to npm and creates the matching GitHub release.
 Standalone executable packaging is intentionally separate because those
 artifacts must be built on their corresponding operating-system runners.
 

@@ -41,4 +41,4 @@ jobs:
       - run: pnpm quality
       - run: pnpm pack
       - shell: bash
-        run: npx --yes ./aleph-agent-cli-*.tgz --version
+        run: npx --yes ./gubkin-labs-aleph-cli-*.tgz --version

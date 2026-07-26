@@ -1,5 +1,5 @@
 {
-  "name": "@aleph-agent/cli",
+  "name": "@gubkin-labs/aleph-cli",
   "version": "0.1.0",
   "private": false,
   "type": "module",
