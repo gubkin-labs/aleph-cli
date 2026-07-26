@@ -20,6 +20,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm quality
-      - run: pnpm pack --ignore-scripts
+      - run: pnpm pack
       - shell: bash
         run: npx --yes ./aleph-agent-cli-*.tgz --version
