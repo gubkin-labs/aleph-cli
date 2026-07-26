@@ -58,3 +58,18 @@ pnpm package:binaries
 ```
 
 The application API client is generated from Aleph’s `/doc` OpenAPI document.
+
+## Releases
+
+Every push to `main` runs the release workflow after the full quality suite.
+semantic-release publishes at least a patch release for every push; conventional
+`feat` and breaking commits still select minor and major versions. The workflow
+publishes `@aleph-agent/cli` to npm and creates the matching GitHub release.
+Standalone executable packaging is intentionally separate because those
+artifacts must be built on their corresponding operating-system runners.
+
+Publishing uses npm trusted publishing. Configure npm with the GitHub repository
+`gubkin-labs/aleph-cli` and workflow `.github/workflows/release.yml`. Because npm
+trusted publishers are configured on an existing package, bootstrap the first
+publication with an npm automation token if the package has never been
+published; subsequent releases use GitHub OIDC without a long-lived token.
