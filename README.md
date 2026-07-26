@@ -73,3 +73,16 @@ Publishing uses npm trusted publishing. Configure npm with the GitHub repository
 trusted publishers are configured on an existing package, bootstrap the first
 publication with an npm automation token if the package has never been
 published; subsequent releases use GitHub OIDC without a long-lived token.
+
+### Commit messages
+
+All commits must follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/):
+
+```text
+<type>[optional scope][!]: <description>
+```
+
+Examples: `fix(auth): clear revoked sessions`, `feat(agents): add batch sync`,
+and `feat(api)!: replace upload response`. Husky validates messages locally,
+and CI validates every commit in a push or pull request so bypassing local hooks
+does not bypass the convention.
