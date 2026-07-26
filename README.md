@@ -64,15 +64,23 @@ The application API client is generated from Aleph’s `/doc` OpenAPI document.
 Every push to `main` runs the release workflow after the full quality suite.
 semantic-release publishes at least a patch release for every push; conventional
 `feat` and breaking commits still select minor and major versions. The workflow
-publishes `@gubkin-labs/aleph-cli` to npm and creates the matching GitHub release.
+updates `package.json`, creates the version tag, and publishes the matching
+GitHub release. It does not publish to npm.
 Standalone executable packaging is intentionally separate because those
 artifacts must be built on their corresponding operating-system runners.
 
-Publishing uses npm trusted publishing. Configure npm with the GitHub repository
-`gubkin-labs/aleph-cli` and workflow `.github/workflows/release.yml`. Because npm
-trusted publishers are configured on an existing package, bootstrap the first
-publication with an npm automation token if the package has never been
-published; subsequent releases use GitHub OIDC without a long-lived token.
+After semantic-release commits a version, publish it manually from an
+authenticated local checkout:
+
+```bash
+git pull
+pnpm install --frozen-lockfile
+pnpm quality
+npm publish --access public
+```
+
+The release commit uses `chore(release): <version> [skip ci]`, which satisfies
+commitlint and prevents a recursive workflow run.
 
 ### Commit messages
 

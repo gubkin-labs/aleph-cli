@@ -8,10 +8,9 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
-  id-token: write
 
 concurrency:
-  group: npm-release
+  group: semantic-release
   cancel-in-progress: false
 
 jobs:
@@ -28,8 +27,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm quality
-      - name: Publish npm package and GitHub release
+      - name: Version and create GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm release
