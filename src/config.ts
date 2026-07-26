@@ -9,7 +9,9 @@ const apiUrlSchema = z
   .transform((value) => value.replace(TRAILING_SLASH_PATTERN, ""));
 
 export const resolveApiUrl = (value?: string): string =>
-  apiUrlSchema.parse(value ?? process.env.ALEPH_API_URL ?? DEFAULT_API_URL);
+  apiUrlSchema.parse(
+    value?.trim() || process.env.ALEPH_API_URL?.trim() || DEFAULT_API_URL
+  );
 
 export const globalOptionsSchema = z.object({
   apiKey: z.string().min(1).optional(),

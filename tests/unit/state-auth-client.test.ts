@@ -6,6 +6,7 @@ import {
 } from "../../src/agents/state.js";
 import { pathSerializer } from "../../src/api/client.js";
 import { resolveCredential } from "../../src/auth/resolve-credential.js";
+import { DEFAULT_API_URL, resolveApiUrl } from "../../src/config.js";
 
 describe("state, credentials, and generated client behavior", () => {
   it("scopes agent IDs by API origin", () => {
@@ -44,5 +45,11 @@ describe("state, credentials, and generated client behavior", () => {
     expect(pathSerializer("/agents/:agentId", { agentId: "agent / one" })).toBe(
       "/agents/agent%20%2F%20one"
     );
+  });
+
+  it("treats a blank API URL environment value as unset", () => {
+    process.env.ALEPH_API_URL = " ";
+    expect(resolveApiUrl()).toBe(DEFAULT_API_URL);
+    delete process.env.ALEPH_API_URL;
   });
 });
