@@ -55,6 +55,22 @@ export const setStateAgentId = (
   },
 });
 
+export const removeStateAgentId = (
+  state: AgentState,
+  apiUrl: string,
+  key: string
+): AgentState => {
+  const target = { ...state.targets[apiUrl] };
+  delete target[key];
+  const targets = { ...state.targets };
+  if (Object.keys(target).length === 0) {
+    delete targets[apiUrl];
+  } else {
+    targets[apiUrl] = target;
+  }
+  return { ...state, targets };
+};
+
 export const saveState = async (
   root: string,
   state: AgentState

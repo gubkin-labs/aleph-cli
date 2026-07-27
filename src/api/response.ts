@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { AuthenticationError, CliError } from "../errors.js";
+import { ApiError, AuthenticationError } from "../errors.js";
 
 const apiErrorSchema = z.object({
   code: z.string().optional(),
@@ -21,7 +21,8 @@ export const throwApiError = (
       message ?? "Authentication expired or was rejected. Run `aleph login`."
     );
   }
-  throw new CliError(
-    `${action} failed (${response.status}): ${message ?? response.statusText}`
+  throw new ApiError(
+    `${action} failed (${response.status}): ${message ?? response.statusText}`,
+    response.status
   );
 };

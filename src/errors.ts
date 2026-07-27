@@ -14,3 +14,13 @@ export class AuthenticationError extends CliError {
     this.name = "AuthenticationError";
   }
 }
+
+export class ApiError extends CliError {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}

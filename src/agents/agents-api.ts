@@ -38,6 +38,19 @@ const metadataBody = (manifest: AgentManifest): Record<string, unknown> => ({
 });
 
 export const agentsApi = {
+  async archive(
+    client: ApiClient,
+    agentId: string
+  ): Promise<z.infer<typeof agentSchema>> {
+    const result = await client.POST("/agents/:agentId/archive", {
+      params: { path: { agentId } },
+    });
+    if (!result.data) {
+      throwApiError(result.response, result.error, "Archive agent");
+    }
+    return agentSchema.parse(result.data);
+  },
+
   async create(
     client: ApiClient,
     manifest: AgentManifest

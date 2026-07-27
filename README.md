@@ -43,10 +43,13 @@ Each bundle contains a sync-only `aleph.json`:
 manifest shaped as `{ "agents": ["path/to/agent"] }`.
 
 Remote IDs are resolved only from `agentId` or `.aleph/state.json`; display
-names are never used as identity. Synchronization creates or updates metadata,
-uploads a version, and enables that exact version. Use `--no-enable` for
-catalog templates, `--dry-run` to validate without mutations, and
-`--continue-on-error` for batch processing.
+names are never used as identity. `agents sync` treats the discovered folders
+as the source of truth: it archives any previously synchronized bundle that is
+no longer present locally, then removes its saved ID. If that archived agent
+was already deleted, sync reports a warning and continues. Synchronization
+creates or updates metadata, uploads a version, and enables that exact version.
+Use `--no-enable` for catalog templates, `--dry-run` to validate without
+mutations, and `--continue-on-error` for batch processing.
 
 ## Development
 
