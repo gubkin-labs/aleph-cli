@@ -17,6 +17,8 @@ import {
 } from "./config.js";
 import { CliError } from "./errors.js";
 import { createOutput } from "./output.js";
+import { type VaultScope, vaultApi } from "./vault/vault-api.js";
+import { resolveVaultValue } from "./vault/vault-value.js";
 
 const packageVersion = "0.1.0";
 
@@ -110,6 +112,50 @@ export const createProgram = (): Command => {
     });
 
   const agents = program.command("agents").description("Manage Aleph agents");
+
+  const vault = program
+    .command("vault")
+    .description("Manage Aleph vault values");
+  vault
+    .command("set <name>")
+    .description("Create or update a vault value without printing it")
+    .option("--value <value>", "Vault value; prefer --value-stdin in CI")
+    .option("--value-stdin", "Read the vault value from standard input")
+    .option("--description <description>", "Vault entry description")
+    .option("--org <organization-id>", "Organization vault scope")
+    .option("--team <team-id>", "Team vault scope")
+    .action(async (name: string, raw: unknown, command: Command) => {
+      const current = await context(command);
+      const parsed = z
+        .object({
+          description: z.string().min(1).optional(),
+          org: z.string().min(1).optional(),
+          team: z.string().min(1).optional(),
+          value: z.string().optional(),
+          valueStdin: z.boolean().optional(),
+        })
+        .refine((value) => !(value.org && value.team), {
+          message: "Use only one of --org or --team.",
+        })
+        .parse(raw);
+      const value = await resolveVaultValue(parsed);
+      let scope: VaultScope = { kind: "user" };
+      if (parsed.org) {
+        scope = { id: parsed.org, kind: "org" };
+      } else if (parsed.team) {
+        scope = { id: parsed.team, kind: "team" };
+      }
+      const input = parsed.description
+        ? { description: parsed.description, name, value }
+        : { name, value };
+      const entry = await vaultApi.set(current.client, scope, input);
+      current.output.data({
+        description: entry.description ?? null,
+        name: entry.name,
+        scope: scope.kind === "user" ? "user" : `${scope.kind}:${scope.id}`,
+        updated: true,
+      });
+    });
 
   agents
     .command("list")

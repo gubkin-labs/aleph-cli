@@ -7,6 +7,7 @@ or CI workflow.
 npx @gubkin-labs/aleph-cli login
 npx @gubkin-labs/aleph-cli agents push ./my-agent
 ALEPH_API_KEY=... npx @gubkin-labs/aleph-cli agents sync . --json
+printf '%s' "$TOKEN" | ALEPH_API_KEY=... npx @gubkin-labs/aleph-cli vault set GH_TOKEN --value-stdin
 ```
 
 Global installation and the standalone release binaries expose the same
@@ -22,6 +23,19 @@ environment variable and then the stored browser session.
 
 The API origin defaults to `https://api.aleph-agent.com`; override it with
 `ALEPH_API_URL` or `--api-url`.
+
+## Vault
+
+`aleph vault set <name>` creates or updates a vault value without printing the
+value. By default it targets the authenticated user's vault; use `--org <id>`
+or `--team <id>` for a scoped vault. Pass `--value <value>` for local use, or
+prefer `--value-stdin` for CI so the secret is not present in command arguments:
+
+```bash
+printf '%s' "$ALEPH_REPOS_TOKEN" | aleph vault set GH_TOKEN \
+  --value-stdin \
+  --description "Repository token for Aleph CMO"
+```
 
 ## Agent manifests
 
