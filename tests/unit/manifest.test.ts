@@ -15,7 +15,7 @@ describe("agent manifests and bundle files", () => {
     expect(
       agentManifestSchema.parse({
         description: "A useful agent",
-        labels: ["Engineering"],
+        labels: ["Trading"],
         name: "Builder",
       }).visibility
     ).toBe("public");

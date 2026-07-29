@@ -14,6 +14,7 @@ const categories = [
   "Research",
   "Lifestyle",
   "Productivity",
+  "Trading",
 ] as const;
 
 export const agentManifestSchema = z

@@ -3110,7 +3110,7 @@ export interface paths {
                 query?: {
                     ids?: string;
                     search?: string;
-                    label?: "Marketing" | "Production" | "FinOps" | "Engineering" | "Sales" | "Research" | "Lifestyle" | "Productivity";
+                    label?: "Marketing" | "Production" | "FinOps" | "Engineering" | "Sales" | "Research" | "Lifestyle" | "Productivity" | "Trading";
                     sort?: "popular" | "most-cloned" | "newest";
                     page?: number;
                     pageSize?: number;
