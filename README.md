@@ -66,9 +66,11 @@ Display names and `.aleph/state.json` are never identity fallbacks.
 as the source of truth: it archives any previously synchronized bundle that is
 no longer present locally, then removes its saved ID. If that archived agent
 was already deleted, sync reports a warning and continues. Synchronization
-creates or updates metadata and uploads the runtime bundle. If its file paths
-and bytes match the latest version, the CLI reports `unchanged` and does not
-create, enable, disable, or repin a version. `.aleph/state.json` remains only
+creates or updates metadata and uploads the runtime bundle. If its file paths,
+bytes, and `aleph.json` metadata match the latest version, the CLI reports
+`unchanged` and does not create, enable, disable, or repin a version. `agentId`
+is excluded from this comparison because it is identity, not versioned metadata.
+`.aleph/state.json` remains only
 for reconciling bundle folders removed from Git.
 Use `--no-enable` for catalog templates, `--dry-run` to validate without
 mutations, and `--continue-on-error` for batch processing.

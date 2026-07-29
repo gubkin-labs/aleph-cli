@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve, sep } from "node:path";
 
@@ -55,6 +55,18 @@ export const repositoryManifestSchema = z.object({
 });
 
 export type AgentManifest = z.infer<typeof agentManifestSchema>;
+
+export const hashAgentManifest = (manifest: AgentManifest): string => {
+  const metadata = {
+    description: manifest.description,
+    icon: manifest.icon,
+    iconUrl: manifest.iconUrl,
+    labels: manifest.labels,
+    name: manifest.name,
+    visibility: manifest.visibility,
+  };
+  return createHash("sha256").update(JSON.stringify(metadata)).digest("hex");
+};
 
 const isInside = (parent: string, child: string): boolean =>
   child === parent || child.startsWith(`${parent}${sep}`);

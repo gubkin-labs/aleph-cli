@@ -9,7 +9,7 @@ import type { Output } from "../output.js";
 import { agentsApi } from "./agents-api.js";
 import { collectBundleFiles } from "./files.js";
 import type { AgentManifest } from "./manifest.js";
-import { readAgentManifest } from "./manifest.js";
+import { hashAgentManifest, readAgentManifest } from "./manifest.js";
 import {
   type AgentState,
   bundleStateKey,
@@ -152,11 +152,13 @@ export const syncBundles = async (input: {
   const preparedBundles = await Promise.all(
     input.bundles.map(async (directory) => {
       const absolute = resolve(directory);
+      const sourceManifest = await readAgentManifest(absolute);
       return {
         absolute,
         key: bundleStateKey(input.stateRoot, absolute),
+        manifestHash: hashAgentManifest(sourceManifest),
         manifest: withResolvedIconUrl(
-          await readAgentManifest(absolute),
+          sourceManifest,
           input.stateRoot,
           absolute
         ),
@@ -220,7 +222,8 @@ export const syncBundles = async (input: {
       input.client,
       agent.id,
       files,
-      input.options.message ?? defaultMessage()
+      input.options.message ?? defaultMessage(),
+      bundle.manifestHash
     );
     if (upload.created) {
       if (input.options.enable) {

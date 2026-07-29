@@ -127,13 +127,15 @@ export const agentsApi = {
     client: ApiClient,
     agentId: string,
     files: BundleFile[],
-    message: string
+    message: string,
+    manifestHash: string
   ): Promise<{
     created: boolean;
     version: z.infer<typeof agentVersionSchema>;
   }> {
     const form = new FormData();
     form.append("message", message);
+    form.append("manifestHash", manifestHash);
     for (const file of files) {
       form.append("files", new Blob([file.bytes]), file.path);
     }

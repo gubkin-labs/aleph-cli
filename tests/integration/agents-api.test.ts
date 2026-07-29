@@ -56,7 +56,8 @@ describe("agents API client", () => {
       client,
       "agent-1",
       [{ bytes: new TextEncoder().encode("# Agent"), path: "AGENTS.md" }],
-      "test sync"
+      "test sync",
+      "a".repeat(64)
     );
     await agentsApi.enable(client, "agent-1", upload.version.id);
     expect(upload.created).toBe(false);

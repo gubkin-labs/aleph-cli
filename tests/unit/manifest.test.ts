@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { collectBundleFiles } from "../../src/agents/files.js";
 import {
   agentManifestSchema,
+  hashAgentManifest,
   readAgentManifest,
   resolveSafeChild,
 } from "../../src/agents/manifest.js";
@@ -34,6 +35,25 @@ describe("agent manifests and bundle files", () => {
       })
     ).toThrow();
     expect(() => resolveSafeChild("/tmp/repo", "../outside")).toThrow();
+  });
+
+  it("hashes sync metadata but ignores agentId", () => {
+    const first = agentManifestSchema.parse({
+      agentId: "c53c58d0-a5a4-4f75-b11c-8c9847644af5",
+      description: "A useful agent",
+      labels: ["Trading"],
+      name: "Builder",
+    });
+    const renamedIdentity = {
+      ...first,
+      agentId: "0c87f289-6d53-41d7-8d30-27e0cda73d4b",
+    };
+    const changedMetadata = { ...first, description: "Changed description" };
+
+    expect(hashAgentManifest(renamedIdentity)).toBe(hashAgentManifest(first));
+    expect(hashAgentManifest(changedMetadata)).not.toBe(
+      hashAgentManifest(first)
+    );
   });
 
   it("excludes sync metadata, icons, dependencies, and symlinks", async () => {
