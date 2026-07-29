@@ -122,7 +122,7 @@ export const createProgram = (): Command => {
     .option("--value <value>", "Vault value; prefer --value-stdin in CI")
     .option("--value-stdin", "Read the vault value from standard input")
     .option("--description <description>", "Vault entry description")
-    .option("--org <organization-id>", "Organization vault scope")
+    .option("--org <organization-id-or-slug>", "Organization vault scope")
     .option("--team <team-id>", "Team vault scope")
     .action(async (name: string, raw: unknown, command: Command) => {
       const current = await context(command);

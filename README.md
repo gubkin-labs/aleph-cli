@@ -27,12 +27,14 @@ The API origin defaults to `https://api.aleph-agent.com`; override it with
 ## Vault
 
 `aleph vault set <name>` creates or updates a vault value without printing the
-value. By default it targets the authenticated user's vault; use `--org <id>`
-or `--team <id>` for a scoped vault. Pass `--value <value>` for local use, or
+value. By default it targets the authenticated user's vault; use
+`--org <id-or-slug>` or `--team <id>` for a scoped vault. Pass
+`--value <value>` for local use, or
 prefer `--value-stdin` for CI so the secret is not present in command arguments:
 
 ```bash
 printf '%s' "$ALEPH_REPOS_TOKEN" | aleph vault set GH_TOKEN \
+  --org aleph-featured-agents-org \
   --value-stdin \
   --description "Repository token for Aleph CMO"
 ```
