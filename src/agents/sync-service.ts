@@ -13,7 +13,6 @@ import { readAgentManifest } from "./manifest.js";
 import {
   type AgentState,
   bundleStateKey,
-  getStateAgentId,
   loadState,
   removeStateAgentId,
   saveState,
@@ -37,7 +36,7 @@ export interface SyncResult {
   readonly agentId?: string;
   readonly directory: string;
   readonly error?: string;
-  readonly status: "created" | "updated" | "planned" | "failed";
+  readonly status: "created" | "updated" | "unchanged" | "planned" | "failed";
   readonly versionId?: string;
 }
 
@@ -71,7 +70,6 @@ const withResolvedIconUrl = (
 
 const updateOrCreateAgent = async (input: {
   readonly client: ApiClient;
-  readonly existingId: string | undefined;
   readonly manifest: AgentManifest;
   readonly name: string;
   readonly output: Output;
@@ -79,17 +77,11 @@ const updateOrCreateAgent = async (input: {
   readonly agent: Awaited<ReturnType<typeof agentsApi.create>>;
   readonly created: boolean;
 }> => {
-  if (!input.existingId) {
-    return {
-      agent: await agentsApi.create(input.client, input.manifest),
-      created: true,
-    };
-  }
   try {
     return {
       agent: await agentsApi.update(
         input.client,
-        input.existingId,
+        input.manifest.agentId,
         input.manifest
       ),
       created: false,
@@ -99,7 +91,7 @@ const updateOrCreateAgent = async (input: {
       throw error;
     }
     input.output.progress(
-      `Saved ID for ${input.name} no longer exists; creating it again`
+      `Agent ${input.manifest.agentId} for ${input.name} does not exist; creating it with the manifest ID`
     );
     return {
       agent: await agentsApi.create(input.client, input.manifest),
@@ -157,6 +149,31 @@ export const syncBundles = async (input: {
   readonly output: Output;
   readonly stateRoot: string;
 }): Promise<SyncResult[]> => {
+  const preparedBundles = await Promise.all(
+    input.bundles.map(async (directory) => {
+      const absolute = resolve(directory);
+      return {
+        absolute,
+        key: bundleStateKey(input.stateRoot, absolute),
+        manifest: withResolvedIconUrl(
+          await readAgentManifest(absolute),
+          input.stateRoot,
+          absolute
+        ),
+      };
+    })
+  );
+  const seenAgentIds = new Map<string, string>();
+  for (const bundle of preparedBundles) {
+    const duplicateDirectory = seenAgentIds.get(bundle.manifest.agentId);
+    if (duplicateDirectory) {
+      throw new CliError(
+        `Duplicate agentId ${bundle.manifest.agentId} in ${duplicateDirectory} and ${bundle.key}`
+      );
+    }
+    seenAgentIds.set(bundle.manifest.agentId, bundle.key);
+  }
+
   let state = await loadState(input.stateRoot);
   state = await removeMissingAgents({
     apiUrl: input.apiUrl,
@@ -169,16 +186,10 @@ export const syncBundles = async (input: {
   });
   const limit = pLimit(input.options.concurrency);
 
-  const syncOne = async (directory: string): Promise<SyncResult> => {
-    const absolute = resolve(directory);
-    const manifest = withResolvedIconUrl(
-      await readAgentManifest(absolute),
-      input.stateRoot,
-      absolute
-    );
-    const key = bundleStateKey(input.stateRoot, absolute);
-    const existingId =
-      manifest.agentId ?? getStateAgentId(state, input.apiUrl, key);
+  const syncOne = async (
+    bundle: (typeof preparedBundles)[number]
+  ): Promise<SyncResult> => {
+    const { absolute, key, manifest } = bundle;
 
     input.output.progress(
       `${input.options.dryRun ? "Planning" : "Syncing"} ${basename(absolute)}`
@@ -186,7 +197,7 @@ export const syncBundles = async (input: {
     if (input.options.dryRun) {
       await collectBundleFiles(absolute, manifest.icon);
       return {
-        ...(existingId ? { agentId: existingId } : {}),
+        agentId: manifest.agentId,
         directory: key,
         status: "planned",
       };
@@ -194,7 +205,6 @@ export const syncBundles = async (input: {
 
     const { agent, created } = await updateOrCreateAgent({
       client: input.client,
-      existingId,
       manifest,
       name: basename(absolute),
       output: input.output,
@@ -206,35 +216,41 @@ export const syncBundles = async (input: {
     if (files.length === 0) {
       throw new CliError(`Bundle ${key} has no uploadable files`);
     }
-    const version = await agentsApi.uploadVersion(
+    const upload = await agentsApi.uploadVersion(
       input.client,
       agent.id,
       files,
       input.options.message ?? defaultMessage()
     );
-    if (input.options.enable) {
-      await agentsApi.enable(input.client, agent.id, version.id);
-    } else {
-      await agentsApi.disable(input.client, agent.id);
+    if (upload.created) {
+      if (input.options.enable) {
+        await agentsApi.enable(input.client, agent.id, upload.version.id);
+      } else {
+        await agentsApi.disable(input.client, agent.id);
+      }
+    }
+    let status: SyncResult["status"] = "unchanged";
+    if (upload.created) {
+      status = created ? "created" : "updated";
     }
     return {
       agentId: agent.id,
       directory: key,
-      status: created ? "created" : "updated",
-      versionId: version.id,
+      status,
+      versionId: upload.version.id,
     };
   };
 
-  const tasks = input.bundles.map((directory) =>
+  const tasks = preparedBundles.map((bundle) =>
     limit(async (): Promise<SyncResult> => {
       try {
-        return await syncOne(directory);
+        return await syncOne(bundle);
       } catch (error) {
         if (!input.options.continueOnError) {
           throw error;
         }
         return {
-          directory: bundleStateKey(input.stateRoot, directory),
+          directory: bundle.key,
           error: error instanceof Error ? error.message : String(error),
           status: "failed",
         };

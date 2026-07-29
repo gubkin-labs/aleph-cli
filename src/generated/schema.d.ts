@@ -214,6 +214,15 @@ export interface paths {
                         "application/json": components["schemas"]["AgentUnauthorizedResponse"];
                     };
                 };
+                /** @description Agent ID already exists */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentBadRequestResponse"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -505,6 +514,15 @@ export interface paths {
                 };
             };
             responses: {
+                /** @description Bundle unchanged; latest version returned */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentVersion"];
+                    };
+                };
                 /** @description Agent version uploaded */
                 201: {
                     headers: {
@@ -1478,6 +1496,69 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/:agentId/conversations/:conversationId/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    agentId: string;
+                    conversationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StopConversationBody"];
+                };
+            };
+            responses: {
+                /** @description Active conversation turn stopped */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            success: true;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentUnauthorizedResponse"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NotFoundResponse"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -2515,6 +2596,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/billing/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Public billing plan catalog */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PublicBillingPlans"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/billing/account": {
         parameters: {
             query?: never;
@@ -3322,6 +3438,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
+                    /** @description Organization ID or unique slug */
                     organizationId: string;
                 };
                 cookie?: never;
@@ -3363,6 +3480,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
+                    /** @description Organization ID or unique slug */
                     organizationId: string;
                 };
                 cookie?: never;
@@ -3438,6 +3556,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
+                    /** @description Organization ID or unique slug */
                     organizationId: string;
                     name: string;
                 };
@@ -3490,6 +3609,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
+                    /** @description Organization ID or unique slug */
                     organizationId: string;
                     name: string;
                 };
@@ -3540,6 +3660,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
+                    /** @description Organization ID or unique slug */
                     organizationId: string;
                     name: string;
                 };
@@ -4885,6 +5006,9 @@ export interface components {
         ConversationResumeStream: {
             [key: string]: unknown;
         };
+        StopConversationBody: {
+            [key: string]: unknown;
+        };
         ConversationAttachmentsUpload: {
             [key: string]: unknown;
         };
@@ -4937,6 +5061,9 @@ export interface components {
             [key: string]: unknown;
         };
         UsageEventsPage: {
+            [key: string]: unknown;
+        };
+        PublicBillingPlans: {
             [key: string]: unknown;
         };
         BillingAccountSummary: {

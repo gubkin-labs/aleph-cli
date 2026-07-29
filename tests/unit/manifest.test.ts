@@ -7,13 +7,18 @@ import { describe, expect, it } from "vitest";
 import { collectBundleFiles } from "../../src/agents/files.js";
 import {
   agentManifestSchema,
+  readAgentManifest,
   resolveSafeChild,
 } from "../../src/agents/manifest.js";
+
+const GENERATED_AGENT_ID_MESSAGE_PATTERN =
+  /Add "agentId": "[0-9a-f-]{36}" to aleph\.json/;
 
 describe("agent manifests and bundle files", () => {
   it("validates metadata and rejects traversal", () => {
     expect(
       agentManifestSchema.parse({
+        agentId: "c53c58d0-a5a4-4f75-b11c-8c9847644af5",
         description: "A useful agent",
         labels: ["Trading"],
         name: "Builder",
@@ -22,6 +27,7 @@ describe("agent manifests and bundle files", () => {
 
     expect(() =>
       agentManifestSchema.parse({
+        agentId: "0c87f289-6d53-41d7-8d30-27e0cda73d4b",
         description: "Unsafe",
         icon: "../secret.png",
         name: "Unsafe",
@@ -41,5 +47,17 @@ describe("agent manifests and bundle files", () => {
 
     const files = await collectBundleFiles(root, "cover.jpg");
     expect(files.map((file) => file.path)).toEqual(["AGENTS.md"]);
+  });
+
+  it("suggests a permanent UUID when agentId is missing", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-manifest-"));
+    await writeFile(
+      join(root, "aleph.json"),
+      JSON.stringify({ description: "Missing identity", name: "Missing" })
+    );
+
+    await expect(readAgentManifest(root)).rejects.toThrow(
+      GENERATED_AGENT_ID_MESSAGE_PATTERN
+    );
   });
 });

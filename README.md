@@ -45,7 +45,7 @@ Each bundle contains a sync-only `aleph.json`:
 
 ```json
 {
-  "agentId": "optional-existing-id",
+  "agentId": "5c5b86cf-b0d6-4e30-a9a0-58292e3afd59",
   "name": "Repository assistant",
   "description": "Understands this repository.",
   "labels": ["Engineering"],
@@ -58,12 +58,18 @@ Each bundle contains a sync-only `aleph.json`:
 [directory]` discovers `agents/*/aleph.json`, direct child manifests, or a root
 manifest shaped as `{ "agents": ["path/to/agent"] }`.
 
-Remote IDs are resolved only from `agentId` or `.aleph/state.json`; display
-names are never used as identity. `agents sync` treats the discovered folders
+`agentId` is a required UUID and the only create/update identity. On first
+sync Aleph creates that exact ID; later syncs update it. If the field is
+missing, the CLI prints a generated UUID and the exact JSON field to add.
+Display names and `.aleph/state.json` are never identity fallbacks.
+`agents sync` treats the discovered folders
 as the source of truth: it archives any previously synchronized bundle that is
 no longer present locally, then removes its saved ID. If that archived agent
 was already deleted, sync reports a warning and continues. Synchronization
-creates or updates metadata, uploads a version, and enables that exact version.
+creates or updates metadata and uploads the runtime bundle. If its file paths
+and bytes match the latest version, the CLI reports `unchanged` and does not
+create, enable, disable, or repin a version. `.aleph/state.json` remains only
+for reconciling bundle folders removed from Git.
 Use `--no-enable` for catalog templates, `--dry-run` to validate without
 mutations, and `--continue-on-error` for batch processing.
 

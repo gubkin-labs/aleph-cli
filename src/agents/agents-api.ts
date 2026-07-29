@@ -56,12 +56,18 @@ export const agentsApi = {
     manifest: AgentManifest
   ): Promise<z.infer<typeof agentSchema>> {
     const result = await client.POST("/agents", {
-      body: metadataBody(manifest),
+      body: { ...metadataBody(manifest), agentId: manifest.agentId },
     });
     if (!result.data) {
       throwApiError(result.response, result.error, "Create agent");
     }
-    return agentSchema.parse(result.data);
+    const agent = agentSchema.parse(result.data);
+    if (agent.id !== manifest.agentId) {
+      throw new Error(
+        `Create agent returned ID ${agent.id}; expected ${manifest.agentId}`
+      );
+    }
+    return agent;
   },
 
   async disable(
@@ -122,7 +128,10 @@ export const agentsApi = {
     agentId: string,
     files: BundleFile[],
     message: string
-  ): Promise<z.infer<typeof agentVersionSchema>> {
+  ): Promise<{
+    created: boolean;
+    version: z.infer<typeof agentVersionSchema>;
+  }> {
     const form = new FormData();
     form.append("message", message);
     for (const file of files) {
@@ -136,6 +145,9 @@ export const agentsApi = {
     if (!result.data) {
       throwApiError(result.response, result.error, "Upload agent version");
     }
-    return agentVersionSchema.parse(result.data);
+    return {
+      created: result.response.status === 201,
+      version: agentVersionSchema.parse(result.data),
+    };
   },
 };

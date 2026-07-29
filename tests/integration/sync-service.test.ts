@@ -91,7 +91,11 @@ describe("syncBundles", () => {
     await mkdir(bundle, { recursive: true });
     await writeFile(
       join(bundle, "aleph.json"),
-      JSON.stringify({ description: "Demo agent", name: "Demo" })
+      JSON.stringify({
+        agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+        description: "Demo agent",
+        name: "Demo",
+      })
     );
     await writeFile(join(bundle, "AGENTS.md"), "# Demo\n");
     await mkdir(join(root, ".aleph"));
@@ -113,10 +117,16 @@ describe("syncBundles", () => {
         return;
       }
       if (request.url?.endsWith("/versions")) {
+        response.statusCode = 201;
         response.end(JSON.stringify({ id: "version-1" }));
         return;
       }
-      response.end(JSON.stringify({ id: "replacement", name: "Demo" }));
+      response.end(
+        JSON.stringify({
+          id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+          name: "Demo",
+        })
+      );
     });
     servers.push(server);
     await new Promise<void>((resolve) =>
@@ -157,27 +167,31 @@ describe("syncBundles", () => {
 
     expect(result).toEqual([
       {
-        agentId: "replacement",
+        agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
         directory: "agents/demo",
         status: "created",
         versionId: "version-1",
       },
     ]);
     expect(requests).toEqual([
-      "PATCH /agents/stale-agent",
+      "PATCH /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
       "POST /agents",
-      "POST /agents/replacement/versions",
-      "POST /agents/replacement/disable",
+      "POST /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1/versions",
+      "POST /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1/disable",
     ]);
     expect(progress).toContain(
-      "Saved ID for demo no longer exists; creating it again"
+      "Agent 45d8ec4c-a713-4d65-a76a-ef099ac57fb1 for demo does not exist; creating it with the manifest ID"
     );
     const state = JSON.parse(
       await readFile(join(root, ".aleph", "state.json"), "utf8")
     );
     expect(state).toEqual({
       schemaVersion: 1,
-      targets: { [apiUrl]: { "agents/demo": "replacement" } },
+      targets: {
+        [apiUrl]: {
+          "agents/demo": "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+        },
+      },
     });
   });
 });

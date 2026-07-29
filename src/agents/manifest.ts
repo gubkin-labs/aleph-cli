@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve, sep } from "node:path";
 
 import { z } from "zod";
+import { CliError } from "../errors.js";
 
 const PATH_SEPARATOR_PATTERN = /[\\/]/u;
 
@@ -19,7 +21,7 @@ const categories = [
 
 export const agentManifestSchema = z
   .object({
-    agentId: z.string().min(1).optional(),
+    agentId: z.uuid(),
     description: z.string().min(1),
     icon: z.string().min(1).optional(),
     iconUrl: z.string().url().optional(),
@@ -71,5 +73,17 @@ export const readAgentManifest = async (
 ): Promise<AgentManifest> => {
   const path = resolve(directory, "aleph.json");
   const text = await readFile(path, "utf8");
-  return agentManifestSchema.parse(JSON.parse(text));
+  const value: unknown = JSON.parse(text);
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !("agentId" in value) ||
+    typeof value.agentId !== "string" ||
+    value.agentId.length === 0
+  ) {
+    throw new CliError(
+      `Missing required agentId in ${path}. Add "agentId": "${randomUUID()}" to aleph.json.`
+    );
+  }
+  return agentManifestSchema.parse(value);
 };

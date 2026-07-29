@@ -290,6 +290,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Agent ID already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentBadRequestResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -558,6 +568,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Bundle unchanged; latest version returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentVersion"
+                }
+              }
+            }
+          },
           "201": {
             "description": "Agent version uploaded",
             "content": {
@@ -1584,6 +1604,77 @@
           },
           "204": {
             "description": "No active stream for this conversation"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentUnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents/:agentId/conversations/:conversationId/stop": {
+      "post": {
+        "tags": ["Conversations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "agentId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "conversationId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopConversationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Active conversation turn stopped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [true]
+                    }
+                  },
+                  "required": ["success"]
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -2734,6 +2825,23 @@
         }
       }
     },
+    "/billing/plans": {
+      "get": {
+        "tags": ["Billing"],
+        "responses": {
+          "200": {
+            "description": "Public billing plan catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBillingPlans"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/billing/account": {
       "get": {
         "tags": ["Billing"],
@@ -3546,9 +3654,11 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "Organization ID or unique slug"
             },
             "required": true,
+            "description": "Organization ID or unique slug",
             "name": "organizationId",
             "in": "path"
           }
@@ -3591,9 +3701,11 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "Organization ID or unique slug"
             },
             "required": true,
+            "description": "Organization ID or unique slug",
             "name": "organizationId",
             "in": "path"
           }
@@ -3667,9 +3779,11 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "Organization ID or unique slug"
             },
             "required": true,
+            "description": "Organization ID or unique slug",
             "name": "organizationId",
             "in": "path"
           },
@@ -3730,9 +3844,11 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "Organization ID or unique slug"
             },
             "required": true,
+            "description": "Organization ID or unique slug",
             "name": "organizationId",
             "in": "path"
           },
@@ -3802,9 +3918,11 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "Organization ID or unique slug"
             },
             "required": true,
+            "description": "Organization ID or unique slug",
             "name": "organizationId",
             "in": "path"
           },
@@ -5109,308 +5227,316 @@
   "components": {
     "schemas": {
       "RootResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "HealthResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "SessionResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "SessionUnauthorizedResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "AgentVisibility": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "AgentsPage": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "AgentUnauthorizedResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "CreateAgentBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "Agent": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "AgentBadRequestResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "NotFoundResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "UpdateAgentBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "AgentVersionsPage": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "AgentVersion": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "VersionUploadInvalidResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "VersionFilesDownload": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "CloneAgentBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "CloneAgentResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "EnableAgentBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "MemoryFilesList": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "MemoryFileContent": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "MemoryFileBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "CreateConversationBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "Conversation": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConversationsPage": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConversationEventsStream": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConversationMessages": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "PostConversationMessageBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConversationMessageStream": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConversationResumeStream": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "StopConversationBody": {
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConversationAttachmentsUpload": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConversationAttachmentBytes": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ChannelStatus": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConnectDiscordBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConnectDiscordResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConnectTelegramBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ConnectTelegramResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "UpdateDiscordHomeChannelBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ChannelPairingGroup": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "DiscordScheduleChannelOption": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "AgentSchedulesResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "AgentScheduleRunResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "AgentUsageSummary": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "BillingUnauthorizedResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "BillingNotFoundResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "UsageBreakdown": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "BillingForbiddenResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "UsageEventsPage": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "PublicBillingPlans": {
+        "additionalProperties": true,
+        "type": "object"
       },
       "BillingAccountSummary": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "EntitlementStatus": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "BillingInvoicesPage": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "BillingCheckoutBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "BillingCheckoutResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "PublicCatalogPage": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "PublicCatalogVoteBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "PublicCatalogVoteSummary": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "PostsResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "UnauthorizedResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "CreatePostBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "Post": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "BadRequestResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "ForbiddenResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "VaultEntryList": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "VaultUnauthorizedResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "VaultForbiddenResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "CreateVaultEntryBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "VaultEntryMetadata": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "VaultBadRequestResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "VaultConflictResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "VaultNotFoundResponse": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "UpdateVaultEntryBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "RuntimeVariableList": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "RuntimeVariableError": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "CreateRuntimeVariableBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "RuntimeVariable": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       },
       "UpdateRuntimeVariableBody": {
-        "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "type": "object"
       }
     }
   }

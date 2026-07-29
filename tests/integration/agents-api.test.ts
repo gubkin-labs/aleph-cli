@@ -52,13 +52,14 @@ describe("agents API client", () => {
       value: "test-key",
     });
 
-    const version = await agentsApi.uploadVersion(
+    const upload = await agentsApi.uploadVersion(
       client,
       "agent-1",
       [{ bytes: new TextEncoder().encode("# Agent"), path: "AGENTS.md" }],
       "test sync"
     );
-    await agentsApi.enable(client, "agent-1", version.id);
+    await agentsApi.enable(client, "agent-1", upload.version.id);
+    expect(upload.created).toBe(false);
 
     expect(requests).toEqual([
       {
