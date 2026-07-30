@@ -80,7 +80,9 @@ and `versionId` are excluded from this comparison because they are identity and
 pin bookkeeping, not versioned metadata.
 `.aleph/state.json` remains only
 for reconciling bundle folders removed from Git.
-Use `--no-enable` for catalog templates, `--dry-run` to validate without
+Use `--no-enable` for catalog templates (disables **new** agents only;
+existing agents keep their current enabled/disabled state — already-enabled
+agents are repinned to the new version), `--dry-run` to validate without
 mutations (gate checks still run), and `--continue-on-error` for batch processing.
 
 ## Development

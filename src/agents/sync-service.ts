@@ -107,6 +107,31 @@ const getRemoteAgent = async (
   }
 };
 
+/**
+ * After a new version upload: create path respects `--no-enable`; existing
+ * agents keep enabled/disabled (repin when already enabled or `--enable`).
+ */
+const applySyncLifecycle = async (input: {
+  readonly client: ApiClient;
+  readonly created: boolean;
+  readonly enable: boolean;
+  readonly existingMode: string | undefined;
+  readonly agentId: string;
+  readonly versionId: string;
+}): Promise<void> => {
+  if (input.created) {
+    if (input.enable) {
+      await agentsApi.enable(input.client, input.agentId, input.versionId);
+      return;
+    }
+    await agentsApi.disable(input.client, input.agentId);
+    return;
+  }
+  if (input.enable || input.existingMode === "enabled") {
+    await agentsApi.enable(input.client, input.agentId, input.versionId);
+  }
+};
+
 const updateOrCreateAgent = async (input: {
   readonly client: ApiClient;
   readonly existing: Awaited<ReturnType<typeof agentsApi.get>> | null;
@@ -274,11 +299,14 @@ export const syncBundles = async (input: {
       bundle.manifestHash
     );
     if (upload.created) {
-      if (input.options.enable) {
-        await agentsApi.enable(input.client, agent.id, upload.version.id);
-      } else {
-        await agentsApi.disable(input.client, agent.id);
-      }
+      await applySyncLifecycle({
+        agentId: agent.id,
+        client: input.client,
+        created,
+        enable: input.options.enable,
+        existingMode: existing?.mode,
+        versionId: upload.version.id,
+      });
     }
     await writeAgentManifest(absolute, {
       ...sourceManifest,

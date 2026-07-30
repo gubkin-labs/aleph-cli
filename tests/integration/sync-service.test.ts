@@ -335,6 +335,148 @@ describe("syncBundles", () => {
       JSON.parse(await readFile(join(bundle, "aleph.json"), "utf8")).versionId
     ).toBe(versionId);
   });
+
+  it("does not disable an existing agent when syncing with --no-enable", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-cli-sync-"));
+    directories.push(root);
+    const versionId = "11111111-1111-4111-8111-111111111111";
+    const nextVersionId = "44444444-4444-4444-8444-444444444444";
+    const bundle = await writeDemoBundle(root, { versionId });
+    const requests: string[] = [];
+    const apiUrl = await startServer((request, response) => {
+      requests.push(`${request.method} ${request.url}`);
+      response.setHeader("content-type", "application/json");
+      if (request.url?.endsWith("/versions") && request.method === "POST") {
+        response.statusCode = 201;
+        response.end(JSON.stringify({ id: nextVersionId }));
+        return;
+      }
+      if (request.method === "PATCH") {
+        response.end(
+          JSON.stringify({
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "disabled",
+            name: "Demo",
+            pinnedVersionId: null,
+          })
+        );
+        return;
+      }
+      response.end(
+        JSON.stringify({
+          id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+          mode: "disabled",
+          name: "Demo",
+          pinnedVersionId: null,
+        })
+      );
+    });
+
+    const result = await syncBundles({
+      apiUrl,
+      bundles: [bundle],
+      client: createApiClient(apiUrl, { kind: "api-key", value: "test-key" }),
+      options: {
+        concurrency: 1,
+        continueOnError: false,
+        dryRun: false,
+        enable: false,
+      },
+      output: silentOutput,
+      stateRoot: root,
+    });
+
+    expect(result).toEqual([
+      {
+        agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+        directory: "agents/demo",
+        status: "updated",
+        versionId: nextVersionId,
+      },
+    ]);
+    expect(requests).toEqual([
+      "GET /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+      "PATCH /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+      "POST /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1/versions",
+    ]);
+    expect(requests.some((entry) => entry.includes("/disable"))).toBe(false);
+    expect(requests.some((entry) => entry.includes("/enable"))).toBe(false);
+  });
+
+  it("repins an already-enabled agent when syncing with --no-enable", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-cli-sync-"));
+    directories.push(root);
+    const versionId = "11111111-1111-4111-8111-111111111111";
+    const nextVersionId = "55555555-5555-4555-8555-555555555555";
+    const bundle = await writeDemoBundle(root, { versionId });
+    const requests: string[] = [];
+    const apiUrl = await startServer((request, response) => {
+      requests.push(`${request.method} ${request.url}`);
+      response.setHeader("content-type", "application/json");
+      if (request.url?.endsWith("/versions") && request.method === "POST") {
+        response.statusCode = 201;
+        response.end(JSON.stringify({ id: nextVersionId }));
+        return;
+      }
+      if (request.url?.endsWith("/enable")) {
+        response.end(
+          JSON.stringify({
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "enabled",
+            name: "Demo",
+            pinnedVersionId: nextVersionId,
+          })
+        );
+        return;
+      }
+      if (request.method === "PATCH") {
+        response.end(
+          JSON.stringify({
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "enabled",
+            name: "Demo",
+            pinnedVersionId: versionId,
+          })
+        );
+        return;
+      }
+      response.end(
+        JSON.stringify({
+          id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+          mode: "enabled",
+          name: "Demo",
+          pinnedVersionId: versionId,
+        })
+      );
+    });
+
+    const result = await syncBundles({
+      apiUrl,
+      bundles: [bundle],
+      client: createApiClient(apiUrl, { kind: "api-key", value: "test-key" }),
+      options: {
+        concurrency: 1,
+        continueOnError: false,
+        dryRun: false,
+        enable: false,
+      },
+      output: silentOutput,
+      stateRoot: root,
+    });
+
+    expect(result).toEqual([
+      {
+        agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+        directory: "agents/demo",
+        status: "updated",
+        versionId: nextVersionId,
+      },
+    ]);
+    expect(requests).toContain(
+      "POST /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1/enable"
+    );
+    expect(requests.some((entry) => entry.includes("/disable"))).toBe(false);
+  });
 });
 
 describe("pullBundle", () => {

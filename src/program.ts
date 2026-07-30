@@ -43,7 +43,10 @@ const context = async (command: Command) => {
 const addSyncOptions = (command: Command): Command =>
   command
     .option("--dry-run", "Validate and describe operations without mutation")
-    .option("--no-enable", "Leave synchronized agents disabled")
+    .option(
+      "--no-enable",
+      "Disable only newly created agents; leave existing agents' enabled state unchanged"
+    )
     .option("--message <message>", "Version message")
     .option("--concurrency <number>", "Maximum parallel bundles", "1")
     .option(
