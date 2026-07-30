@@ -5,6 +5,7 @@ import { z } from "zod";
 import { agentsApi } from "./agents/agents-api.js";
 import { discoverBundles } from "./agents/discover.js";
 import { readAgentManifest } from "./agents/manifest.js";
+import { pullBundle } from "./agents/pull-service.js";
 import { syncBundles, syncOptionsSchema } from "./agents/sync-service.js";
 import { createApiClient } from "./api/client.js";
 import { login } from "./auth/auth-service.js";
@@ -212,6 +213,22 @@ export const createProgram = (): Command => {
       handleResults(results, command);
     }
   );
+
+  agents
+    .command("pull [directory]")
+    .description(
+      "Download the pinned (or latest) version into a local bundle and stamp versionId"
+    )
+    .action(async (directory: string | undefined, command: Command) => {
+      const current = await context(command);
+      const bundle = resolve(directory ?? ".");
+      const result = await pullBundle({
+        client: current.client,
+        directory: bundle,
+        output: current.output,
+      });
+      current.output.data(result);
+    });
 
   addSyncOptions(
     agents

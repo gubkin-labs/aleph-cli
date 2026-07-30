@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -10,6 +10,7 @@ import {
   hashAgentManifest,
   readAgentManifest,
   resolveSafeChild,
+  writeAgentManifest,
 } from "../../src/agents/manifest.js";
 
 const GENERATED_AGENT_ID_MESSAGE_PATTERN =
@@ -23,6 +24,7 @@ describe("agent manifests and bundle files", () => {
         description: "A useful agent",
         labels: ["Trading"],
         name: "Builder",
+        versionId: "0c87f289-6d53-41d7-8d30-27e0cda73d4b",
       }).visibility
     ).toBe("public");
 
@@ -37,16 +39,18 @@ describe("agent manifests and bundle files", () => {
     expect(() => resolveSafeChild("/tmp/repo", "../outside")).toThrow();
   });
 
-  it("hashes sync metadata but ignores agentId", () => {
+  it("hashes sync metadata but ignores agentId and versionId", () => {
     const first = agentManifestSchema.parse({
       agentId: "c53c58d0-a5a4-4f75-b11c-8c9847644af5",
       description: "A useful agent",
       labels: ["Trading"],
       name: "Builder",
+      versionId: "11111111-1111-4111-8111-111111111111",
     });
     const renamedIdentity = {
       ...first,
       agentId: "0c87f289-6d53-41d7-8d30-27e0cda73d4b",
+      versionId: "22222222-2222-4222-8222-222222222222",
     };
     const changedMetadata = { ...first, description: "Changed description" };
 
@@ -54,6 +58,26 @@ describe("agent manifests and bundle files", () => {
     expect(hashAgentManifest(changedMetadata)).not.toBe(
       hashAgentManifest(first)
     );
+  });
+
+  it("writes and re-reads manifests with versionId", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-manifest-write-"));
+    const manifest = agentManifestSchema.parse({
+      agentId: "c53c58d0-a5a4-4f75-b11c-8c9847644af5",
+      description: "A useful agent",
+      icon: "cover.jpg",
+      labels: ["Trading"],
+      name: "Builder",
+      versionId: "0c87f289-6d53-41d7-8d30-27e0cda73d4b",
+      visibility: "private",
+    });
+
+    await writeAgentManifest(root, manifest);
+    const written = await readFile(join(root, "aleph.json"), "utf8");
+    expect(written).toContain(
+      '"versionId": "0c87f289-6d53-41d7-8d30-27e0cda73d4b"'
+    );
+    expect(await readAgentManifest(root)).toEqual(manifest);
   });
 
   it("excludes sync metadata, icons, dependencies, and symlinks", async () => {

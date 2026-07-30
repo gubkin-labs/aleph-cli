@@ -29,6 +29,13 @@ const agentsPageSchema = z.object({
   total: z.number(),
 });
 
+const versionsPageSchema = z.object({
+  data: z.array(agentVersionSchema),
+  page: z.number(),
+  pageSize: z.number(),
+  total: z.number(),
+});
+
 const metadataBody = (manifest: AgentManifest): Record<string, unknown> => ({
   description: manifest.description,
   iconUrl: manifest.iconUrl ?? null,
@@ -83,6 +90,43 @@ export const agentsApi = {
     return agentSchema.parse(result.data);
   },
 
+  async downloadVersionFiles(
+    client: ApiClient,
+    agentId: string,
+    versionId: string
+  ): Promise<BundleFile[]> {
+    const result = await client.GET(
+      "/agents/:agentId/versions/:versionId/files",
+      {
+        params: { path: { agentId, versionId } },
+        parseAs: "arrayBuffer",
+      }
+    );
+    if (!result.response.ok) {
+      throwApiError(result.response, result.error, "Download version files");
+    }
+    const contentType = result.response.headers.get("content-type");
+    if (!(result.data instanceof ArrayBuffer && contentType)) {
+      throw new Error(
+        "Download version files returned an empty multipart body"
+      );
+    }
+    const formData = await new Response(result.data, {
+      headers: { "content-type": contentType },
+    }).formData();
+    const files: BundleFile[] = [];
+    for (const entry of formData.getAll("files")) {
+      if (!(entry instanceof File)) {
+        continue;
+      }
+      files.push({
+        bytes: new Uint8Array(await entry.arrayBuffer()),
+        path: entry.name,
+      });
+    }
+    return files.sort((left, right) => left.path.localeCompare(right.path));
+  },
+
   async enable(
     client: ApiClient,
     agentId: string,
@@ -98,6 +142,19 @@ export const agentsApi = {
     return agentSchema.parse(result.data);
   },
 
+  async get(
+    client: ApiClient,
+    agentId: string
+  ): Promise<z.infer<typeof agentSchema>> {
+    const result = await client.GET("/agents/:agentId", {
+      params: { path: { agentId } },
+    });
+    if (!result.data) {
+      throwApiError(result.response, result.error, "Get agent");
+    }
+    return agentSchema.parse(result.data);
+  },
+
   async list(client: ApiClient): Promise<z.infer<typeof agentsPageSchema>> {
     const result = await client.GET("/agents", {
       params: { query: { page: 1, pageSize: 100 } },
@@ -106,6 +163,19 @@ export const agentsApi = {
       throwApiError(result.response, result.error, "List agents");
     }
     return agentsPageSchema.parse(result.data);
+  },
+
+  async listVersions(
+    client: ApiClient,
+    agentId: string
+  ): Promise<z.infer<typeof versionsPageSchema>> {
+    const result = await client.GET("/agents/:agentId/versions", {
+      params: { path: { agentId } },
+    });
+    if (!result.data) {
+      throwApiError(result.response, result.error, "List agent versions");
+    }
+    return versionsPageSchema.parse(result.data);
   },
 
   async update(

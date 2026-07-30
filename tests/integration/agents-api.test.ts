@@ -75,4 +75,61 @@ describe("agents API client", () => {
       },
     ]);
   });
+
+  it("gets an agent and downloads multipart version files", async () => {
+    const boundary = "download-boundary";
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="files"; filename="AGENTS.md"',
+      "Content-Type: text/markdown",
+      "",
+      "# Agent",
+      `--${boundary}--`,
+      "",
+    ].join("\r\n");
+    const server = createServer((request, response) => {
+      if (request.url?.endsWith("/files")) {
+        response.statusCode = 200;
+        response.setHeader(
+          "content-type",
+          `multipart/form-data; boundary=${boundary}`
+        );
+        response.end(body);
+        return;
+      }
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          id: "agent-1",
+          mode: "enabled",
+          name: "Agent",
+          pinnedVersionId: "version-1",
+        })
+      );
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve)
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Test server did not expose a TCP address");
+    }
+    const client = createApiClient(`http://127.0.0.1:${address.port}`, {
+      kind: "api-key",
+      value: "test-key",
+    });
+
+    const agent = await agentsApi.get(client, "agent-1");
+    const files = await agentsApi.downloadVersionFiles(
+      client,
+      "agent-1",
+      "version-1"
+    );
+
+    expect(agent.pinnedVersionId).toBe("version-1");
+    expect(files).toHaveLength(1);
+    expect(files[0]?.path).toBe("AGENTS.md");
+    expect(new TextDecoder().decode(files[0]?.bytes)).toBe("# Agent");
+  });
 });

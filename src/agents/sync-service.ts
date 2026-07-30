@@ -9,7 +9,11 @@ import type { Output } from "../output.js";
 import { agentsApi } from "./agents-api.js";
 import { collectBundleFiles } from "./files.js";
 import type { AgentManifest } from "./manifest.js";
-import { hashAgentManifest, readAgentManifest } from "./manifest.js";
+import {
+  hashAgentManifest,
+  readAgentManifest,
+  writeAgentManifest,
+} from "./manifest.js";
 import {
   type AgentState,
   bundleStateKey,
@@ -68,8 +72,44 @@ const withResolvedIconUrl = (
   };
 };
 
+const assertSyncVersionGate = (input: {
+  readonly agent: Awaited<ReturnType<typeof agentsApi.get>>;
+  readonly directory: string;
+  readonly manifest: AgentManifest;
+}): void => {
+  if (!input.manifest.versionId) {
+    throw new CliError(
+      `Agent ${input.manifest.agentId} exists remotely but ${input.directory}/aleph.json has no versionId. Run \`aleph agents pull ${input.directory}\` to absorb the live version before push/sync.`
+    );
+  }
+  if (
+    input.agent.mode === "enabled" &&
+    input.agent.pinnedVersionId &&
+    input.agent.pinnedVersionId !== input.manifest.versionId
+  ) {
+    throw new CliError(
+      `Agent ${input.manifest.agentId} is enabled on pin ${input.agent.pinnedVersionId}, but aleph.json has versionId ${input.manifest.versionId}. Run \`aleph agents pull ${input.directory}\` to absorb the live version before push/sync.`
+    );
+  }
+};
+
+const getRemoteAgent = async (
+  client: ApiClient,
+  agentId: string
+): Promise<Awaited<ReturnType<typeof agentsApi.get>> | null> => {
+  try {
+    return await agentsApi.get(client, agentId);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+};
+
 const updateOrCreateAgent = async (input: {
   readonly client: ApiClient;
+  readonly existing: Awaited<ReturnType<typeof agentsApi.get>> | null;
   readonly manifest: AgentManifest;
   readonly name: string;
   readonly output: Output;
@@ -77,7 +117,7 @@ const updateOrCreateAgent = async (input: {
   readonly agent: Awaited<ReturnType<typeof agentsApi.create>>;
   readonly created: boolean;
 }> => {
-  try {
+  if (input.existing) {
     return {
       agent: await agentsApi.update(
         input.client,
@@ -86,18 +126,14 @@ const updateOrCreateAgent = async (input: {
       ),
       created: false,
     };
-  } catch (error) {
-    if (!(error instanceof ApiError && error.status === 404)) {
-      throw error;
-    }
-    input.output.progress(
-      `Agent ${input.manifest.agentId} for ${input.name} does not exist; creating it with the manifest ID`
-    );
-    return {
-      agent: await agentsApi.create(input.client, input.manifest),
-      created: true,
-    };
   }
+  input.output.progress(
+    `Agent ${input.manifest.agentId} for ${input.name} does not exist; creating it with the manifest ID`
+  );
+  return {
+    agent: await agentsApi.create(input.client, input.manifest),
+    created: true,
+  };
 };
 
 const removeMissingAgents = async (input: {
@@ -162,6 +198,7 @@ export const syncBundles = async (input: {
           input.stateRoot,
           absolute
         ),
+        sourceManifest,
       };
     })
   );
@@ -191,11 +228,21 @@ export const syncBundles = async (input: {
   const syncOne = async (
     bundle: (typeof preparedBundles)[number]
   ): Promise<SyncResult> => {
-    const { absolute, key, manifest } = bundle;
+    const { absolute, key, manifest, sourceManifest } = bundle;
 
     input.output.progress(
       `${input.options.dryRun ? "Planning" : "Syncing"} ${basename(absolute)}`
     );
+
+    const existing = await getRemoteAgent(input.client, manifest.agentId);
+    if (existing) {
+      assertSyncVersionGate({
+        agent: existing,
+        directory: key,
+        manifest: sourceManifest,
+      });
+    }
+
     if (input.options.dryRun) {
       await collectBundleFiles(absolute, manifest.icon);
       return {
@@ -207,6 +254,7 @@ export const syncBundles = async (input: {
 
     const { agent, created } = await updateOrCreateAgent({
       client: input.client,
+      existing,
       manifest,
       name: basename(absolute),
       output: input.output,
@@ -232,6 +280,10 @@ export const syncBundles = async (input: {
         await agentsApi.disable(input.client, agent.id);
       }
     }
+    await writeAgentManifest(absolute, {
+      ...sourceManifest,
+      versionId: upload.version.id,
+    });
     let status: SyncResult["status"] = "unchanged";
     if (upload.created) {
       status = created ? "created" : "updated";

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, resolve, sep } from "node:path";
 
 import { z } from "zod";
@@ -27,6 +27,7 @@ export const agentManifestSchema = z
     iconUrl: z.string().url().optional(),
     labels: z.array(z.enum(categories)).max(3).default([]),
     name: z.string().min(1),
+    versionId: z.uuid().optional(),
     visibility: z.enum(["private", "public"]).default("public"),
   })
   .superRefine((value, context) => {
@@ -78,6 +79,41 @@ export const resolveSafeChild = (root: string, child: string): string => {
     throw new Error(`Path escapes repository root: ${child}`);
   }
   return absoluteChild;
+};
+
+const serializeAgentManifest = (manifest: AgentManifest): string => {
+  const payload: Record<string, unknown> = {
+    agentId: manifest.agentId,
+    name: manifest.name,
+    description: manifest.description,
+  };
+  if (manifest.labels.length > 0) {
+    payload.labels = manifest.labels;
+  }
+  if (manifest.icon !== undefined) {
+    payload.icon = manifest.icon;
+  }
+  if (manifest.iconUrl !== undefined) {
+    payload.iconUrl = manifest.iconUrl;
+  }
+  if (manifest.visibility !== "public") {
+    payload.visibility = manifest.visibility;
+  }
+  if (manifest.versionId !== undefined) {
+    payload.versionId = manifest.versionId;
+  }
+  return `${JSON.stringify(payload, null, 2)}\n`;
+};
+
+export const writeAgentManifest = async (
+  directory: string,
+  manifest: AgentManifest
+): Promise<void> => {
+  await writeFile(
+    resolve(directory, "aleph.json"),
+    serializeAgentManifest(manifest),
+    "utf8"
+  );
 };
 
 export const readAgentManifest = async (

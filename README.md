@@ -50,17 +50,24 @@ Each bundle contains a sync-only `aleph.json`:
   "description": "Understands this repository.",
   "labels": ["Engineering"],
   "visibility": "private",
-  "icon": "cover.jpg"
+  "icon": "cover.jpg",
+  "versionId": "11111111-1111-4111-8111-111111111111"
 }
 ```
 
 `aleph agents push [directory]` publishes one bundle. `aleph agents sync
 [directory]` discovers `agents/*/aleph.json`, direct child manifests, or a root
 manifest shaped as `{ "agents": ["path/to/agent"] }`.
+`aleph agents pull [directory]` downloads the pinned (or latest) remote version
+into the local folder and stamps `versionId`.
 
 `agentId` is a required UUID and the only create/update identity. On first
 sync Aleph creates that exact ID; later syncs update it. If the field is
 missing, the CLI prints a generated UUID and the exact JSON field to add.
+Optional `versionId` tracks which Aleph version Git last absorbed or published.
+Push/sync blocks when a remote agent already exists and `versionId` is missing,
+or when the agent is enabled on a different pin — pull first. New agents
+(GET 404) may publish without `versionId`; a successful push/sync stamps it.
 Display names and `.aleph/state.json` are never identity fallbacks.
 `agents sync` treats the discovered folders
 as the source of truth: it archives any previously synchronized bundle that is
@@ -69,11 +76,12 @@ was already deleted, sync reports a warning and continues. Synchronization
 creates or updates metadata and uploads the runtime bundle. If its file paths,
 bytes, and `aleph.json` metadata match the latest version, the CLI reports
 `unchanged` and does not create, enable, disable, or repin a version. `agentId`
-is excluded from this comparison because it is identity, not versioned metadata.
+and `versionId` are excluded from this comparison because they are identity and
+pin bookkeeping, not versioned metadata.
 `.aleph/state.json` remains only
 for reconciling bundle folders removed from Git.
 Use `--no-enable` for catalog templates, `--dry-run` to validate without
-mutations, and `--continue-on-error` for batch processing.
+mutations (gate checks still run), and `--continue-on-error` for batch processing.
 
 ## Development
 
