@@ -17,7 +17,7 @@ const servers: ReturnType<typeof createServer>[] = [];
 const directories: string[] = [];
 const PIN_DRIFT_MESSAGE_PATTERN = /22222222-2222-4222-8222-222222222222/;
 const PULL_GUIDANCE_PATTERN =
-  /Do not edit versionId by hand\. Run `aleph agents pull .+` \(or `aleph agents pull` from the repo root/;
+  /Do not edit versionId by hand\. Run `aleph agents pull .+` to download live files \+ stamp versionId, or `aleph agents pull .+ --stamp-version-id`/;
 const AGENT_ID_FROM_URL_PATTERN = /\/agents\/([^/]+)/;
 
 afterEach(async () => {
@@ -538,12 +538,64 @@ describe("pullBundle", () => {
       agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
       directory: bundle,
       fileCount: 2,
+      status: "pulled",
       versionId,
     });
     expect(await readFile(join(bundle, "AGENTS.md"), "utf8")).toBe("# Pulled");
     expect(await readFile(join(bundle, "README.md"), "utf8")).toBe("# Readme");
     expect(await readFile(join(bundle, "local-extra.md"), "utf8")).toBe(
       "keep me\n"
+    );
+    expect(
+      JSON.parse(await readFile(join(bundle, "aleph.json"), "utf8")).versionId
+    ).toBe(versionId);
+  });
+
+  it("stamps versionId without overwriting local files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-cli-stamp-"));
+    directories.push(root);
+    const bundle = await writeDemoBundle(root, {
+      versionId: "11111111-1111-4111-8111-111111111111",
+    });
+    await writeFile(join(bundle, "AGENTS.md"), "# Local edits\n");
+    const versionId = "33333333-3333-4333-8333-333333333333";
+    let filesRequested = false;
+
+    const apiUrl = await startServer((request, response) => {
+      if (request.url?.endsWith("/files")) {
+        filesRequested = true;
+        response.statusCode = 500;
+        response.end("should not download");
+        return;
+      }
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+          mode: "enabled",
+          name: "Demo",
+          pinnedVersionId: versionId,
+        })
+      );
+    });
+
+    const result = await pullBundle({
+      client: createApiClient(apiUrl, { kind: "api-key", value: "test-key" }),
+      directory: bundle,
+      output: silentOutput,
+      stampVersionId: true,
+    });
+
+    expect(result).toEqual({
+      agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+      directory: bundle,
+      fileCount: 0,
+      status: "stamped",
+      versionId,
+    });
+    expect(filesRequested).toBe(false);
+    expect(await readFile(join(bundle, "AGENTS.md"), "utf8")).toBe(
+      "# Local edits\n"
     );
     expect(
       JSON.parse(await readFile(join(bundle, "aleph.json"), "utf8")).versionId

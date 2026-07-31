@@ -20,6 +20,11 @@ type ApiClient = ReturnType<typeof createApiClient>;
 
 export const pullOptionsSchema = z.object({
   continueOnError: z.boolean().default(false),
+  /**
+   * Only write live pin/latest `versionId` into aleph.json.
+   * Leaves local bundle files unchanged (keeps in-progress edits).
+   */
+  stampVersionId: z.boolean().default(false),
 });
 
 export type PullOptions = z.infer<typeof pullOptionsSchema>;
@@ -28,6 +33,7 @@ export interface PullResult {
   readonly agentId: string;
   readonly directory: string;
   readonly fileCount: number;
+  readonly status: "pulled" | "stamped";
   readonly versionId: string;
 }
 
@@ -36,7 +42,7 @@ export interface PullBundlesResult {
   readonly directory: string;
   readonly error?: string;
   readonly fileCount?: number;
-  readonly status: "failed" | "pulled";
+  readonly status: "failed" | "pulled" | "stamped";
   readonly versionId?: string;
 }
 
@@ -106,10 +112,16 @@ export const pullBundle = async (input: {
   readonly client: ApiClient;
   readonly directory: string;
   readonly output: Output;
+  readonly stampVersionId?: boolean;
 }): Promise<PullResult> => {
   const absolute = resolve(input.directory);
   const manifest: AgentManifest = await readAgentManifest(absolute);
-  input.output.progress(`Pulling ${manifest.agentId}`);
+  const stampOnly = Boolean(input.stampVersionId);
+  input.output.progress(
+    stampOnly
+      ? `Stamping versionId for ${manifest.agentId}`
+      : `Pulling ${manifest.agentId}`
+  );
 
   let agent: Awaited<ReturnType<typeof agentsApi.get>>;
   try {
@@ -124,6 +136,17 @@ export const pullBundle = async (input: {
   }
 
   const versionId = await resolvePullVersionId(input.client, agent);
+  if (stampOnly) {
+    await writeAgentManifest(absolute, { ...manifest, versionId });
+    return {
+      agentId: agent.id,
+      directory: absolute,
+      fileCount: 0,
+      status: "stamped",
+      versionId,
+    };
+  }
+
   const files = await agentsApi.downloadVersionFiles(
     input.client,
     agent.id,
@@ -136,6 +159,7 @@ export const pullBundle = async (input: {
     agentId: agent.id,
     directory: absolute,
     fileCount,
+    status: "pulled",
     versionId,
   };
 };
@@ -162,12 +186,13 @@ export const pullBundles = async (input: {
         client: input.client,
         directory: bundle,
         output: input.output,
+        stampVersionId: options.stampVersionId,
       });
       results.push({
         agentId: pulled.agentId,
         directory: displayDirectory,
         fileCount: pulled.fileCount,
-        status: "pulled",
+        status: pulled.status,
         versionId: pulled.versionId,
       });
     } catch (error) {

@@ -359,6 +359,10 @@ export const createProgram = (): Command => {
       "Download pinned (or latest) versions into local bundles and stamp versionId; discovers all agents under a repo like sync"
     )
     .option(
+      "--stamp-version-id",
+      "Only update aleph.json versionId from the live pin; do not overwrite bundle files"
+    )
+    .option(
       "--continue-on-error",
       "Continue other bundles after a pull failure"
     )

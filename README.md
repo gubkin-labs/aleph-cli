@@ -71,7 +71,9 @@ manifest shaped as `{ "agents": ["path/to/agent"] }`.
 **files** and stamps `versionId`. Pass a single agent folder, or a repo root /
 `agents/` directory (same discovery as sync) to pull every bundle. Prefer pull
 over editing `versionId` by hand so Git matches the live bundle, not only the
-pin id. Use `--continue-on-error` for batch pulls.
+pin id. Use `--stamp-version-id` when you only need the live pin stamped into
+`aleph.json` and must keep local bundle edits. Use `--continue-on-error` for
+batch pulls.
 
 `agentId` is a required UUID and the only create/update identity. On first
 sync Aleph creates that exact ID; later syncs update it. If the field is

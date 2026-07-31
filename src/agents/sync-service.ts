@@ -73,7 +73,7 @@ const withResolvedIconUrl = (
 };
 
 const pullGuidance = (directory: string): string =>
-  `Do not edit versionId by hand. Run \`aleph agents pull ${directory}\` (or \`aleph agents pull\` from the repo root to pull every agent) to download the live bundle files and stamp versionId, then re-run push/sync.`;
+  `Do not edit versionId by hand. Run \`aleph agents pull ${directory}\` to download live files + stamp versionId, or \`aleph agents pull ${directory} --stamp-version-id\` to only stamp versionId and keep local edits (or \`aleph agents pull\` / \`aleph agents pull --stamp-version-id\` from the repo root), then re-run push/sync.`;
 
 const assertSyncVersionGate = (input: {
   readonly agent: Awaited<ReturnType<typeof agentsApi.get>>;
