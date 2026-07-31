@@ -11,6 +11,15 @@ import { syncBundles, syncOptionsSchema } from "./agents/sync-service.js";
 import { createApiClient } from "./api/client.js";
 import { login } from "./auth/auth-service.js";
 import { credentialStore } from "./auth/credential-store.js";
+import {
+  describeActiveScope,
+  formatScopeResult,
+  selectAndApplyOrganizationScope,
+} from "./auth/org-scope.js";
+import {
+  getAuthSession,
+  listOrganizations,
+} from "./auth/organization-client.js";
 import { resolveCredential } from "./auth/resolve-credential.js";
 import {
   type GlobalOptions,
@@ -22,8 +31,31 @@ import { createOutput } from "./output.js";
 import { type VaultScope, vaultApi } from "./vault/vault-api.js";
 import { resolveVaultValue } from "./vault/vault-value.js";
 
+const requireSessionToken = async (
+  command: Command
+): Promise<{
+  apiUrl: string;
+  output: ReturnType<typeof createOutput>;
+  token: string;
+}> => {
+  const current = await context(command);
+  if (current.credential.kind !== "session") {
+    throw new CliError(
+      "Organization scope requires a browser session. Run `aleph login` (API keys are already org-scoped).",
+      2
+    );
+  }
+  return {
+    apiUrl: current.apiUrl,
+    output: current.output,
+    token: current.credential.value,
+  };
+};
+
 const packageVersion = createRequire(import.meta.url)("../package.json")
   .version as string;
+
+const loggedInPrefix = /^Logged in/;
 
 const globalOptions = (command: Command): GlobalOptions =>
   globalOptionsSchema.parse(command.optsWithGlobals());
@@ -80,10 +112,27 @@ export const createProgram = (): Command => {
     .command("login")
     .description("Authenticate through the Aleph browser flow")
     .option("--api-url <url>", "Aleph API origin")
-    .action(async (_options: unknown, command: Command) => {
+    .option("--org <id-or-slug>", "Set organization scope after login")
+    .option("--personal", "Keep Personal scope after login (skip org picker)")
+    .action(async (raw: unknown, command: Command) => {
       const options = globalOptions(command);
+      const parsed = z
+        .object({
+          org: z.string().min(1).optional(),
+          personal: z.boolean().optional(),
+        })
+        .parse(raw);
       const apiUrl = resolveApiUrl(options.apiUrl);
-      await login(apiUrl, createOutput(options.json));
+      const selection = {
+        ...(parsed.org ? { org: parsed.org } : {}),
+        ...(parsed.personal ? { personal: true } : {}),
+      };
+      await login(
+        apiUrl,
+        createOutput(options.json),
+        credentialStore,
+        selection
+      );
     });
 
   program
@@ -109,13 +158,98 @@ export const createProgram = (): Command => {
     .action(async (_options: unknown, command: Command) => {
       const current = await context(command);
       const agents = await agentsApi.list(current.client);
+      let scope: "organization" | "personal" | "api-key" = "api-key";
+      let organizationId: string | null = null;
+      let organizationName: string | null = null;
+      if (current.credential.kind === "session") {
+        const active = await describeActiveScope({
+          apiUrl: current.apiUrl,
+          token: current.credential.value,
+        });
+        scope = active.scope;
+        organizationId = active.organizationId;
+        organizationName = active.organizationName;
+      }
       current.output.data({
         apiUrl: current.apiUrl,
         authenticated: true,
         credential: current.credential.kind,
+        organizationId,
+        organizationName,
+        scope,
         visibleAgents: agents.total,
       });
     });
+
+  const org = program
+    .command("org")
+    .description("Inspect or change organization scope for the CLI session");
+  org
+    .command("list")
+    .description("List organization memberships and mark the active scope")
+    .action(async (_options: unknown, command: Command) => {
+      const session = await requireSessionToken(command);
+      const [organizations, authSession] = await Promise.all([
+        listOrganizations(session.apiUrl, session.token),
+        getAuthSession(session.apiUrl, session.token),
+      ]);
+      const activeId = authSession.session.activeOrganizationId ?? null;
+      session.output.data({
+        activeOrganizationId: activeId,
+        organizations: [
+          {
+            active: activeId === null,
+            id: null,
+            name: "Personal",
+            slug: null,
+          },
+          ...organizations.map((organization) => ({
+            active: organization.id === activeId,
+            id: organization.id,
+            name: organization.name,
+            slug: organization.slug,
+          })),
+        ],
+        scope: activeId ? "organization" : "personal",
+      });
+    });
+  org
+    .command("switch [id-or-slug]")
+    .description("Set Personal or organization scope for the CLI session")
+    .option("--personal", "Switch to Personal scope")
+    .action(
+      async (idOrSlug: string | undefined, raw: unknown, command: Command) => {
+        const session = await requireSessionToken(command);
+        const parsed = z
+          .object({ personal: z.boolean().optional() })
+          .parse(raw);
+        if (parsed.personal && idOrSlug) {
+          throw new CliError("Use only one of [id-or-slug] or --personal.", 1);
+        }
+        const selection = {
+          ...(idOrSlug ? { org: idOrSlug } : {}),
+          ...(parsed.personal ? { personal: true } : {}),
+        };
+        const scope = await selectAndApplyOrganizationScope({
+          apiUrl: session.apiUrl,
+          output: session.output,
+          selection,
+          token: session.token,
+        });
+        session.output.data(
+          session.output.json
+            ? {
+                organizationId: scope.organizationId,
+                organizationName: scope.organizationName,
+                scope: scope.scope,
+              }
+            : formatScopeResult(session.apiUrl, scope).replace(
+                loggedInPrefix,
+                "Switched"
+              )
+        );
+      }
+    );
 
   const agents = program.command("agents").description("Manage Aleph agents");
 

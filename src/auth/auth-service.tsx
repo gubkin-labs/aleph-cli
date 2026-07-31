@@ -6,6 +6,11 @@ import type { CredentialStore } from "./credential-store.js";
 import { credentialStore } from "./credential-store.js";
 import { pollDeviceToken, requestDeviceCode } from "./device-client.js";
 import { LoginView } from "./login-view.js";
+import {
+  formatScopeResult,
+  type OrganizationScopeSelection,
+  selectAndApplyOrganizationScope,
+} from "./org-scope.js";
 
 const sleep = async (milliseconds: number): Promise<void> => {
   await new Promise<void>((resolve) => {
@@ -16,7 +21,8 @@ const sleep = async (milliseconds: number): Promise<void> => {
 export const login = async (
   apiUrl: string,
   output: Output,
-  store: CredentialStore = credentialStore
+  store: CredentialStore = credentialStore,
+  selection: OrganizationScopeSelection = {}
 ): Promise<void> => {
   const device = await requestDeviceCode(apiUrl);
   const verificationUrl =
@@ -48,8 +54,22 @@ export const login = async (
     if (result.status === "complete") {
       await store.set(apiUrl, result.token.access_token);
       view?.unmount();
+      const scope = await selectAndApplyOrganizationScope({
+        apiUrl,
+        output,
+        selection,
+        token: result.token.access_token,
+      });
       output.data(
-        output.json ? { apiUrl, authenticated: true } : `Logged in to ${apiUrl}`
+        output.json
+          ? {
+              apiUrl,
+              authenticated: true,
+              organizationId: scope.organizationId,
+              organizationName: scope.organizationName,
+              scope: scope.scope,
+            }
+          : formatScopeResult(apiUrl, scope)
       );
       return;
     }

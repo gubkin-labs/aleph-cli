@@ -17,9 +17,18 @@ Global installation and the standalone release binaries expose the same
 
 `aleph login` opens the Aleph browser authorization page and stores the
 resulting session in macOS Keychain, Windows Credential Manager, or the Linux
-Secret Service. CI should provide a user or organization API key through
-`ALEPH_API_KEY`. A `--api-key` flag takes precedence, followed by the
-environment variable and then the stored browser session.
+Secret Service. After approval, the CLI prompts for **Personal** or an
+organization membership and calls Better Auth `set-active` on that session so
+`agents list` / `pull` / `sync` use the same org scope as the web app. Use
+`--org <id-or-slug>` or `--personal` to skip the picker (required for
+non-interactive / `--json` login when you need an org). Switch later with
+`aleph org list` and `aleph org switch [id-or-slug]` (or `--personal`).
+`aleph auth status` reports the active `scope` and organization.
+
+CI should provide a user or organization API key through `ALEPH_API_KEY`. A
+`--api-key` flag takes precedence, followed by the environment variable and then
+the stored browser session. Organization API keys are already org-scoped;
+`aleph org switch` requires a browser session.
 
 The API origin defaults to `https://api.aleph-agent.com`; override it with
 `ALEPH_API_URL` or `--api-url`.
