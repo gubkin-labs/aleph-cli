@@ -1,18 +1,28 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { dirname, relative, resolve } from "node:path";
+
+import { z } from "zod";
 
 import type { createApiClient } from "../api/client.js";
 import { ApiError, CliError } from "../errors.js";
 import type { Output } from "../output.js";
 import { agentsApi } from "./agents-api.js";
+import { discoverBundles } from "./discover.js";
 import {
   type AgentManifest,
   readAgentManifest,
+  repositoryManifestSchema,
   resolveSafeChild,
   writeAgentManifest,
 } from "./manifest.js";
 
 type ApiClient = ReturnType<typeof createApiClient>;
+
+export const pullOptionsSchema = z.object({
+  continueOnError: z.boolean().default(false),
+});
+
+export type PullOptions = z.infer<typeof pullOptionsSchema>;
 
 export interface PullResult {
   readonly agentId: string;
@@ -20,6 +30,42 @@ export interface PullResult {
   readonly fileCount: number;
   readonly versionId: string;
 }
+
+export interface PullBundlesResult {
+  readonly agentId?: string;
+  readonly directory: string;
+  readonly error?: string;
+  readonly fileCount?: number;
+  readonly status: "failed" | "pulled";
+  readonly versionId?: string;
+}
+
+const exists = async (path: string): Promise<boolean> =>
+  stat(path)
+    .then(() => true)
+    .catch(() => false);
+
+export const resolvePullTargets = async (
+  inputDirectory: string
+): Promise<{ readonly bundles: string[]; readonly stateRoot: string }> => {
+  const root = resolve(inputDirectory);
+  const manifestPath = resolve(root, "aleph.json");
+  if (await exists(manifestPath)) {
+    const parsed: unknown = JSON.parse(await readFile(manifestPath, "utf8"));
+    const repository = repositoryManifestSchema.safeParse(parsed);
+    if (repository.success) {
+      return {
+        bundles: repository.data.agents.map((path) =>
+          resolveSafeChild(root, path)
+        ),
+        stateRoot: root,
+      };
+    }
+    await readAgentManifest(root);
+    return { bundles: [root], stateRoot: root };
+  }
+  return discoverBundles(root);
+};
 
 const resolvePullVersionId = async (
   client: ApiClient,
@@ -92,4 +138,50 @@ export const pullBundle = async (input: {
     fileCount,
     versionId,
   };
+};
+
+export const pullBundles = async (input: {
+  readonly client: ApiClient;
+  readonly directory: string;
+  readonly options?: PullOptions;
+  readonly output: Output;
+}): Promise<PullBundlesResult[]> => {
+  const options = pullOptionsSchema.parse(input.options ?? {});
+  const { bundles, stateRoot } = await resolvePullTargets(input.directory);
+  if (bundles.length === 0) {
+    throw new CliError(
+      `No agent bundles found under ${resolve(input.directory)}`
+    );
+  }
+
+  const results: PullBundlesResult[] = [];
+  for (const bundle of bundles) {
+    const displayDirectory = relative(stateRoot, bundle) || ".";
+    try {
+      const pulled = await pullBundle({
+        client: input.client,
+        directory: bundle,
+        output: input.output,
+      });
+      results.push({
+        agentId: pulled.agentId,
+        directory: displayDirectory,
+        fileCount: pulled.fileCount,
+        status: "pulled",
+        versionId: pulled.versionId,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!options.continueOnError) {
+        throw error;
+      }
+      input.output.error(message);
+      results.push({
+        directory: displayDirectory,
+        error: message,
+        status: "failed",
+      });
+    }
+  }
+  return results;
 };

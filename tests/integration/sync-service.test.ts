@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
-import { pullBundle } from "../../src/agents/pull-service.js";
+import { pullBundle, pullBundles } from "../../src/agents/pull-service.js";
 import { syncBundles } from "../../src/agents/sync-service.js";
 import { createApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/errors.js";
@@ -17,7 +17,8 @@ const servers: ReturnType<typeof createServer>[] = [];
 const directories: string[] = [];
 const PIN_DRIFT_MESSAGE_PATTERN = /22222222-2222-4222-8222-222222222222/;
 const PULL_GUIDANCE_PATTERN =
-  /Do not edit versionId by hand\. Run `aleph agents pull .+` to download the live bundle files/;
+  /Do not edit versionId by hand\. Run `aleph agents pull .+` \(or `aleph agents pull` from the repo root/;
+const AGENT_ID_FROM_URL_PATTERN = /\/agents\/([^/]+)/;
 
 afterEach(async () => {
   await Promise.all([
@@ -547,5 +548,95 @@ describe("pullBundle", () => {
     expect(
       JSON.parse(await readFile(join(bundle, "aleph.json"), "utf8")).versionId
     ).toBe(versionId);
+  });
+
+  it("pulls every discovered agent under a repository root", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-cli-pull-all-"));
+    directories.push(root);
+    const first = await writeDemoBundle(root);
+    const second = join(root, "agents", "other");
+    await mkdir(second, { recursive: true });
+    await writeFile(
+      join(second, "aleph.json"),
+      JSON.stringify({
+        agentId: "56d8ec4c-a713-4d65-a76a-ef099ac57fb2",
+        description: "Other agent",
+        name: "Other",
+      })
+    );
+    await writeFile(join(second, "AGENTS.md"), "# Other\n");
+
+    const versionByAgent: Record<string, string> = {
+      "45d8ec4c-a713-4d65-a76a-ef099ac57fb1":
+        "33333333-3333-4333-8333-333333333333",
+      "56d8ec4c-a713-4d65-a76a-ef099ac57fb2":
+        "44444444-4444-4444-8444-444444444444",
+    };
+    const boundary = "bulk-boundary";
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="files"; filename="AGENTS.md"',
+      "Content-Type: text/markdown",
+      "",
+      "# Pulled bulk",
+      `--${boundary}--`,
+      "",
+    ].join("\r\n");
+
+    const apiUrl = await startServer((request, response) => {
+      if (request.url?.endsWith("/files")) {
+        response.statusCode = 200;
+        response.setHeader(
+          "content-type",
+          `multipart/form-data; boundary=${boundary}`
+        );
+        response.end(body);
+        return;
+      }
+      const agentId = request.url?.match(AGENT_ID_FROM_URL_PATTERN)?.[1];
+      if (!(agentId && agentId in versionByAgent)) {
+        response.statusCode = 404;
+        response.end(JSON.stringify({ message: "Not found" }));
+        return;
+      }
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          id: agentId,
+          mode: "enabled",
+          name: "Demo",
+          pinnedVersionId: versionByAgent[agentId],
+        })
+      );
+    });
+
+    const results = await pullBundles({
+      client: createApiClient(apiUrl, { kind: "api-key", value: "test-key" }),
+      directory: root,
+      output: silentOutput,
+    });
+
+    expect(results).toEqual([
+      {
+        agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+        directory: "agents/demo",
+        fileCount: 1,
+        status: "pulled",
+        versionId: "33333333-3333-4333-8333-333333333333",
+      },
+      {
+        agentId: "56d8ec4c-a713-4d65-a76a-ef099ac57fb2",
+        directory: "agents/other",
+        fileCount: 1,
+        status: "pulled",
+        versionId: "44444444-4444-4444-8444-444444444444",
+      },
+    ]);
+    expect(
+      JSON.parse(await readFile(join(first, "aleph.json"), "utf8")).versionId
+    ).toBe("33333333-3333-4333-8333-333333333333");
+    expect(
+      JSON.parse(await readFile(join(second, "aleph.json"), "utf8")).versionId
+    ).toBe("44444444-4444-4444-8444-444444444444");
   });
 });

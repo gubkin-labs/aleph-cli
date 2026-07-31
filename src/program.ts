@@ -6,7 +6,7 @@ import { z } from "zod";
 import { agentsApi } from "./agents/agents-api.js";
 import { discoverBundles } from "./agents/discover.js";
 import { readAgentManifest } from "./agents/manifest.js";
-import { pullBundle } from "./agents/pull-service.js";
+import { pullBundles, pullOptionsSchema } from "./agents/pull-service.js";
 import { syncBundles, syncOptionsSchema } from "./agents/sync-service.js";
 import { createApiClient } from "./api/client.js";
 import { login } from "./auth/auth-service.js";
@@ -356,22 +356,25 @@ export const createProgram = (): Command => {
   agents
     .command("pull [directory]")
     .description(
-      "Download the pinned (or latest) version into a local bundle and stamp versionId"
+      "Download pinned (or latest) versions into local bundles and stamp versionId; discovers all agents under a repo like sync"
+    )
+    .option(
+      "--continue-on-error",
+      "Continue other bundles after a pull failure"
     )
     .action(
-      async (
-        directory: string | undefined,
-        _options: unknown,
-        command: Command
-      ) => {
+      async (directory: string | undefined, raw: unknown, command: Command) => {
         const current = await context(command);
-        const bundle = resolve(directory ?? ".");
-        const result = await pullBundle({
+        const results = await pullBundles({
           client: current.client,
-          directory: bundle,
+          directory: directory ?? ".",
+          options: pullOptionsSchema.parse(raw),
           output: current.output,
         });
-        current.output.data(result);
+        current.output.data(results.length === 1 ? results[0] : results);
+        if (results.some((result) => result.status === "failed")) {
+          throw new CliError("One or more agents failed to pull.", 3);
+        }
       }
     );
 
