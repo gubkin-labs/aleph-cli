@@ -16,6 +16,8 @@ import { CliError } from "../../src/errors.js";
 const servers: ReturnType<typeof createServer>[] = [];
 const directories: string[] = [];
 const PIN_DRIFT_MESSAGE_PATTERN = /22222222-2222-4222-8222-222222222222/;
+const PULL_GUIDANCE_PATTERN =
+  /Do not edit versionId by hand\. Run `aleph agents pull .+` to download the live bundle files/;
 
 afterEach(async () => {
   await Promise.all([
@@ -238,7 +240,7 @@ describe("syncBundles", () => {
         output: silentOutput,
         stateRoot: root,
       })
-    ).rejects.toThrow(CliError);
+    ).rejects.toThrow(PULL_GUIDANCE_PATTERN);
   });
 
   it("blocks sync when the enabled pin differs from versionId", async () => {
@@ -259,21 +261,23 @@ describe("syncBundles", () => {
       );
     });
 
-    await expect(
-      syncBundles({
-        apiUrl,
-        bundles: [bundle],
-        client: createApiClient(apiUrl, { kind: "api-key", value: "test-key" }),
-        options: {
-          concurrency: 1,
-          continueOnError: false,
-          dryRun: true,
-          enable: true,
-        },
-        output: silentOutput,
-        stateRoot: root,
-      })
-    ).rejects.toThrow(PIN_DRIFT_MESSAGE_PATTERN);
+    const error = await syncBundles({
+      apiUrl,
+      bundles: [bundle],
+      client: createApiClient(apiUrl, { kind: "api-key", value: "test-key" }),
+      options: {
+        concurrency: 1,
+        continueOnError: false,
+        dryRun: true,
+        enable: true,
+      },
+      output: silentOutput,
+      stateRoot: root,
+    }).catch((value: unknown) => value);
+
+    expect(error).toBeInstanceOf(CliError);
+    expect(String(error)).toMatch(PIN_DRIFT_MESSAGE_PATTERN);
+    expect(String(error)).toMatch(PULL_GUIDANCE_PATTERN);
   });
 
   it("allows sync and stamps versionId when pin matches", async () => {

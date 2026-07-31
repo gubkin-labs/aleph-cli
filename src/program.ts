@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
 import { Command } from "commander";
@@ -21,7 +22,8 @@ import { createOutput } from "./output.js";
 import { type VaultScope, vaultApi } from "./vault/vault-api.js";
 import { resolveVaultValue } from "./vault/vault-value.js";
 
-const packageVersion = "0.1.0";
+const packageVersion = createRequire(import.meta.url)("../package.json")
+  .version as string;
 
 const globalOptions = (command: Command): GlobalOptions =>
   globalOptionsSchema.parse(command.optsWithGlobals());
@@ -222,16 +224,22 @@ export const createProgram = (): Command => {
     .description(
       "Download the pinned (or latest) version into a local bundle and stamp versionId"
     )
-    .action(async (directory: string | undefined, command: Command) => {
-      const current = await context(command);
-      const bundle = resolve(directory ?? ".");
-      const result = await pullBundle({
-        client: current.client,
-        directory: bundle,
-        output: current.output,
-      });
-      current.output.data(result);
-    });
+    .action(
+      async (
+        directory: string | undefined,
+        _options: unknown,
+        command: Command
+      ) => {
+        const current = await context(command);
+        const bundle = resolve(directory ?? ".");
+        const result = await pullBundle({
+          client: current.client,
+          directory: bundle,
+          output: current.output,
+        });
+        current.output.data(result);
+      }
+    );
 
   addSyncOptions(
     agents

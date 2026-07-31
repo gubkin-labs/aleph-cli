@@ -72,6 +72,9 @@ const withResolvedIconUrl = (
   };
 };
 
+const pullGuidance = (directory: string): string =>
+  `Do not edit versionId by hand. Run \`aleph agents pull ${directory}\` to download the live bundle files into that folder and stamp versionId, then re-run push/sync.`;
+
 const assertSyncVersionGate = (input: {
   readonly agent: Awaited<ReturnType<typeof agentsApi.get>>;
   readonly directory: string;
@@ -79,7 +82,7 @@ const assertSyncVersionGate = (input: {
 }): void => {
   if (!input.manifest.versionId) {
     throw new CliError(
-      `Agent ${input.manifest.agentId} exists remotely but ${input.directory}/aleph.json has no versionId. Run \`aleph agents pull ${input.directory}\` to absorb the live version before push/sync.`
+      `Agent ${input.manifest.agentId} exists remotely but ${input.directory}/aleph.json has no versionId. ${pullGuidance(input.directory)}`
     );
   }
   if (
@@ -88,7 +91,7 @@ const assertSyncVersionGate = (input: {
     input.agent.pinnedVersionId !== input.manifest.versionId
   ) {
     throw new CliError(
-      `Agent ${input.manifest.agentId} is enabled on pin ${input.agent.pinnedVersionId}, but aleph.json has versionId ${input.manifest.versionId}. Run \`aleph agents pull ${input.directory}\` to absorb the live version before push/sync.`
+      `Agent ${input.manifest.agentId} is enabled on pin ${input.agent.pinnedVersionId}, but aleph.json has versionId ${input.manifest.versionId}. ${pullGuidance(input.directory)}`
     );
   }
 };

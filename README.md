@@ -59,15 +59,17 @@ Each bundle contains a sync-only `aleph.json`:
 [directory]` discovers `agents/*/aleph.json`, direct child manifests, or a root
 manifest shaped as `{ "agents": ["path/to/agent"] }`.
 `aleph agents pull [directory]` downloads the pinned (or latest) remote version
-into the local folder and stamps `versionId`.
+**files** into the local folder and stamps `versionId`. Prefer pull over editing
+`versionId` by hand so Git matches the live bundle, not only the pin id.
 
 `agentId` is a required UUID and the only create/update identity. On first
 sync Aleph creates that exact ID; later syncs update it. If the field is
 missing, the CLI prints a generated UUID and the exact JSON field to add.
 Optional `versionId` tracks which Aleph version Git last absorbed or published.
 Push/sync blocks when a remote agent already exists and `versionId` is missing,
-or when the agent is enabled on a different pin — pull first. New agents
-(GET 404) may publish without `versionId`; a successful push/sync stamps it.
+or when the agent is enabled on a different pin — run `aleph agents pull` first
+(it fetches files and stamps `versionId`). New agents (GET 404) may publish
+without `versionId`; a successful push/sync stamps it.
 Display names and `.aleph/state.json` are never identity fallbacks.
 `agents sync` treats the discovered folders
 as the source of truth: it archives any previously synchronized bundle that is
