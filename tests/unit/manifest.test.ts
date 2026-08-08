@@ -15,6 +15,8 @@ import {
 
 const GENERATED_AGENT_ID_MESSAGE_PATTERN =
   /Add "agentId": "[0-9a-f-]{36}" to aleph\.json/;
+const TEMPLATE_AGENT_ID_MESSAGE_PATTERN =
+  /Invalid agentId "TEMPLATE".*pnpm init-agents/;
 
 describe("agent manifests and bundle files", () => {
   it("validates metadata and rejects traversal", () => {
@@ -102,6 +104,22 @@ describe("agent manifests and bundle files", () => {
 
     await expect(readAgentManifest(root)).rejects.toThrow(
       GENERATED_AGENT_ID_MESSAGE_PATTERN
+    );
+  });
+
+  it("rejects TEMPLATE and other non-UUID agentIds with setup guidance", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-manifest-template-"));
+    await writeFile(
+      join(root, "aleph.json"),
+      JSON.stringify({
+        agentId: "TEMPLATE",
+        description: "Template identity",
+        name: "Template",
+      })
+    );
+
+    await expect(readAgentManifest(root)).rejects.toThrow(
+      TEMPLATE_AGENT_ID_MESSAGE_PATTERN
     );
   });
 });

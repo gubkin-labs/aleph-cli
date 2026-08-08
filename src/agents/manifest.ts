@@ -133,5 +133,13 @@ export const readAgentManifest = async (
       `Missing required agentId in ${path}. Add "agentId": "${randomUUID()}" to aleph.json.`
     );
   }
+  if (
+    value.agentId === "TEMPLATE" ||
+    !z.uuid().safeParse(value.agentId).success
+  ) {
+    throw new CliError(
+      `Invalid agentId "${value.agentId}" in ${path}. Run \`pnpm init-agents\` (or replace TEMPLATE with a permanent UUID) before syncing.`
+    );
+  }
   return agentManifestSchema.parse(value);
 };
