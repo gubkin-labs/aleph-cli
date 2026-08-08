@@ -212,8 +212,19 @@ describe("syncBundles", () => {
     const root = await mkdtemp(join(tmpdir(), "aleph-cli-sync-"));
     directories.push(root);
     const bundle = await writeDemoBundle(root);
-    const apiUrl = await startServer((_request, response) => {
+    const apiUrl = await startServer((request, response) => {
       response.setHeader("content-type", "application/json");
+      if (request.url?.endsWith("/versions") && request.method === "GET") {
+        response.end(
+          JSON.stringify({
+            data: [{ id: "version-existing" }],
+            page: 1,
+            pageSize: 100,
+            total: 1,
+          })
+        );
+        return;
+      }
       response.end(
         JSON.stringify({
           id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
@@ -242,6 +253,88 @@ describe("syncBundles", () => {
         stateRoot: root,
       })
     ).rejects.toThrow(PULL_GUIDANCE_PATTERN);
+  });
+
+  it("allows first sync when remote agent exists with no versions yet", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-cli-sync-"));
+    directories.push(root);
+    const bundle = await writeDemoBundle(root);
+    const requests: string[] = [];
+    const apiUrl = await startServer((request, response) => {
+      requests.push(`${request.method} ${request.url}`);
+      response.setHeader("content-type", "application/json");
+      if (request.url?.endsWith("/versions") && request.method === "GET") {
+        response.end(
+          JSON.stringify({
+            data: [],
+            page: 1,
+            pageSize: 100,
+            total: 0,
+          })
+        );
+        return;
+      }
+      if (request.url?.endsWith("/versions") && request.method === "POST") {
+        response.statusCode = 201;
+        response.end(JSON.stringify({ id: "version-1" }));
+        return;
+      }
+      if (request.url?.endsWith("/disable")) {
+        response.end(
+          JSON.stringify({
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "disabled",
+            name: "Demo",
+          })
+        );
+        return;
+      }
+      if (request.method === "PATCH") {
+        response.end(
+          JSON.stringify({
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "disabled",
+            name: "Demo",
+            pinnedVersionId: null,
+          })
+        );
+        return;
+      }
+      response.end(
+        JSON.stringify({
+          id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+          mode: "disabled",
+          name: "Demo",
+          pinnedVersionId: null,
+        })
+      );
+    });
+
+    const result = await syncBundles({
+      apiUrl,
+      bundles: [bundle],
+      client: createApiClient(apiUrl, { kind: "api-key", value: "test-key" }),
+      options: {
+        concurrency: 1,
+        continueOnError: false,
+        dryRun: false,
+        enable: false,
+      },
+      output: silentOutput,
+      stateRoot: root,
+    });
+
+    expect(result).toEqual([
+      {
+        agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+        directory: "agents/demo",
+        status: "updated",
+        versionId: "version-1",
+      },
+    ]);
+    expect(requests).toContain(
+      "GET /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1/versions"
+    );
   });
 
   it("blocks sync when the enabled pin differs from versionId", async () => {

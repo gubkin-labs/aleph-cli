@@ -75,12 +75,24 @@ const withResolvedIconUrl = (
 const pullGuidance = (directory: string): string =>
   `Do not edit versionId by hand. Run \`aleph agents pull ${directory}\` to download live files + stamp versionId, or \`aleph agents pull ${directory} --stamp-version-id\` to only stamp versionId and keep local edits (or \`aleph agents pull\` / \`aleph agents pull --stamp-version-id\` from the repo root), then re-run push/sync.`;
 
-const assertSyncVersionGate = (input: {
+const assertSyncVersionGate = async (input: {
   readonly agent: Awaited<ReturnType<typeof agentsApi.get>>;
+  readonly client: ApiClient;
   readonly directory: string;
   readonly manifest: AgentManifest;
-}): void => {
+}): Promise<void> => {
   if (!input.manifest.versionId) {
+    // Agent row can exist after a create-only / failed sync with no published
+    // version yet — allow the first upload without a stamped versionId.
+    if (!input.agent.pinnedVersionId) {
+      const versions = await agentsApi.listVersions(
+        input.client,
+        input.agent.id
+      );
+      if (versions.data.length === 0) {
+        return;
+      }
+    }
     throw new CliError(
       `Agent ${input.manifest.agentId} exists remotely but ${input.directory}/aleph.json has no versionId. ${pullGuidance(input.directory)}`
     );
@@ -331,8 +343,9 @@ export const syncBundles = async (input: {
 
     const existing = await getRemoteAgent(input.client, manifest.agentId);
     if (existing) {
-      assertSyncVersionGate({
+      await assertSyncVersionGate({
         agent: existing,
+        client: input.client,
         directory: key,
         manifest: sourceManifest,
       });
