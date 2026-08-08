@@ -135,6 +135,22 @@ const applySyncLifecycle = async (input: {
   }
 };
 
+const isArchivedAgent = (
+  agent: Awaited<ReturnType<typeof agentsApi.get>> | null
+): boolean => Boolean(agent?.archivedAt);
+
+const unarchiveExistingAgent = async (input: {
+  readonly agent: Awaited<ReturnType<typeof agentsApi.get>>;
+  readonly client: ApiClient;
+  readonly name: string;
+  readonly output: Output;
+}): Promise<Awaited<ReturnType<typeof agentsApi.get>>> => {
+  input.output.progress(
+    `Agent ${input.agent.id} for ${input.name} is archived; unarchiving it`
+  );
+  return await agentsApi.unarchive(input.client, input.agent.id);
+};
+
 const updateOrCreateAgent = async (input: {
   readonly client: ApiClient;
   readonly existing: Awaited<ReturnType<typeof agentsApi.get>> | null;
@@ -146,6 +162,14 @@ const updateOrCreateAgent = async (input: {
   readonly created: boolean;
 }> => {
   if (input.existing) {
+    if (isArchivedAgent(input.existing)) {
+      await unarchiveExistingAgent({
+        agent: input.existing,
+        client: input.client,
+        name: input.name,
+        output: input.output,
+      });
+    }
     return {
       agent: await agentsApi.update(
         input.client,
@@ -158,10 +182,53 @@ const updateOrCreateAgent = async (input: {
   input.output.progress(
     `Agent ${input.manifest.agentId} for ${input.name} does not exist; creating it with the manifest ID`
   );
-  return {
-    agent: await agentsApi.create(input.client, input.manifest),
-    created: true,
-  };
+  try {
+    return {
+      agent: await agentsApi.create(input.client, input.manifest),
+      created: true,
+    };
+  } catch (error) {
+    if (
+      !(
+        error instanceof ApiError &&
+        error.status === 409 &&
+        error.message.includes("Agent ID already exists")
+      )
+    ) {
+      throw error;
+    }
+    // Same UUID still exists (often archived) but GET looked missing — e.g.
+    // temporary auth/visibility mismatch. Recover by unarchive + update.
+    input.output.progress(
+      `Agent ${input.manifest.agentId} for ${input.name} already exists; attempting unarchive + update`
+    );
+    try {
+      await agentsApi.unarchive(input.client, input.manifest.agentId);
+    } catch (unarchiveError) {
+      if (
+        !(unarchiveError instanceof ApiError && unarchiveError.status === 404)
+      ) {
+        throw unarchiveError;
+      }
+    }
+    const recovered = await getRemoteAgent(
+      input.client,
+      input.manifest.agentId
+    );
+    if (!recovered) {
+      throw new CliError(
+        `Create agent failed (409): Agent ID ${input.manifest.agentId} already exists but is not readable with this API key. Use the owning organization key, unarchive the agent in Aleph, or assign a new agentId.`
+      );
+    }
+    return {
+      agent: await agentsApi.update(
+        input.client,
+        input.manifest.agentId,
+        input.manifest
+      ),
+      created: false,
+    };
+  }
 };
 
 const removeMissingAgents = async (input: {
@@ -272,6 +339,11 @@ export const syncBundles = async (input: {
     }
 
     if (input.options.dryRun) {
+      if (isArchivedAgent(existing)) {
+        input.output.progress(
+          `Planning unarchive of archived agent ${manifest.agentId}`
+        );
+      }
       await collectBundleFiles(absolute, manifest.icon);
       return {
         agentId: manifest.agentId,

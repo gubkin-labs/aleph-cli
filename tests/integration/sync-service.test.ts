@@ -341,6 +341,192 @@ describe("syncBundles", () => {
     ).toBe(versionId);
   });
 
+  it("unarchives an existing archived agent before updating", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-cli-sync-"));
+    directories.push(root);
+    const versionId = "11111111-1111-4111-8111-111111111111";
+    const nextVersionId = "66666666-6666-4666-8666-666666666666";
+    const bundle = await writeDemoBundle(root, { versionId });
+    const requests: string[] = [];
+    const progress: string[] = [];
+    const apiUrl = await startServer((request, response) => {
+      requests.push(`${request.method} ${request.url}`);
+      response.setHeader("content-type", "application/json");
+      if (request.url?.endsWith("/unarchive") && request.method === "POST") {
+        response.end(
+          JSON.stringify({
+            archivedAt: null,
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "disabled",
+            name: "Demo",
+            pinnedVersionId: null,
+          })
+        );
+        return;
+      }
+      if (request.url?.endsWith("/versions") && request.method === "POST") {
+        response.statusCode = 201;
+        response.end(JSON.stringify({ id: nextVersionId }));
+        return;
+      }
+      if (request.method === "PATCH") {
+        response.end(
+          JSON.stringify({
+            archivedAt: null,
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "disabled",
+            name: "Demo",
+            pinnedVersionId: null,
+          })
+        );
+        return;
+      }
+      response.end(
+        JSON.stringify({
+          archivedAt: "2026-08-08T04:42:47.240Z",
+          id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+          mode: "disabled",
+          name: "Demo",
+          pinnedVersionId: null,
+        })
+      );
+    });
+
+    const result = await syncBundles({
+      apiUrl,
+      bundles: [bundle],
+      client: createApiClient(apiUrl, { kind: "api-key", value: "test-key" }),
+      options: {
+        concurrency: 1,
+        continueOnError: false,
+        dryRun: false,
+        enable: false,
+      },
+      output: {
+        ...silentOutput,
+        progress: (message) => progress.push(message),
+      },
+      stateRoot: root,
+    });
+
+    expect(result).toEqual([
+      {
+        agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+        directory: "agents/demo",
+        status: "updated",
+        versionId: nextVersionId,
+      },
+    ]);
+    expect(requests).toEqual([
+      "GET /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+      "POST /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1/unarchive",
+      "PATCH /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+      "POST /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1/versions",
+    ]);
+    expect(progress).toContain(
+      "Agent 45d8ec4c-a713-4d65-a76a-ef099ac57fb1 for demo is archived; unarchiving it"
+    );
+  });
+
+  it("recovers create 409 by unarchiving and updating the existing agent", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aleph-cli-sync-"));
+    directories.push(root);
+    const bundle = await writeDemoBundle(root);
+    const requests: string[] = [];
+    let getCount = 0;
+    const apiUrl = await startServer((request, response) => {
+      requests.push(`${request.method} ${request.url}`);
+      response.setHeader("content-type", "application/json");
+      if (request.method === "GET") {
+        getCount += 1;
+        if (getCount === 1) {
+          response.statusCode = 404;
+          response.end(JSON.stringify({ message: "Not found" }));
+          return;
+        }
+        response.end(
+          JSON.stringify({
+            archivedAt: null,
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "disabled",
+            name: "Demo",
+            pinnedVersionId: null,
+          })
+        );
+        return;
+      }
+      if (request.method === "POST" && request.url === "/agents") {
+        response.statusCode = 409;
+        response.end(JSON.stringify({ message: "Agent ID already exists" }));
+        return;
+      }
+      if (request.url?.endsWith("/unarchive")) {
+        response.end(
+          JSON.stringify({
+            archivedAt: null,
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "disabled",
+            name: "Demo",
+          })
+        );
+        return;
+      }
+      if (request.url?.endsWith("/versions")) {
+        response.statusCode = 201;
+        response.end(JSON.stringify({ id: "version-1" }));
+        return;
+      }
+      if (request.url?.endsWith("/disable")) {
+        response.end(
+          JSON.stringify({
+            id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+            mode: "disabled",
+            name: "Demo",
+          })
+        );
+        return;
+      }
+      response.end(
+        JSON.stringify({
+          id: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+          mode: "disabled",
+          name: "Demo",
+        })
+      );
+    });
+
+    const result = await syncBundles({
+      apiUrl,
+      bundles: [bundle],
+      client: createApiClient(apiUrl, { kind: "api-key", value: "test-key" }),
+      options: {
+        concurrency: 1,
+        continueOnError: false,
+        dryRun: false,
+        enable: false,
+      },
+      output: silentOutput,
+      stateRoot: root,
+    });
+
+    expect(result).toEqual([
+      {
+        agentId: "45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+        directory: "agents/demo",
+        status: "updated",
+        versionId: "version-1",
+      },
+    ]);
+    expect(requests).toEqual([
+      "GET /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+      "POST /agents",
+      "POST /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1/unarchive",
+      "GET /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+      "PATCH /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1",
+      "POST /agents/45d8ec4c-a713-4d65-a76a-ef099ac57fb1/versions",
+    ]);
+  });
+
   it("does not disable an existing agent when syncing with --no-enable", async () => {
     const root = await mkdtemp(join(tmpdir(), "aleph-cli-sync-"));
     directories.push(root);

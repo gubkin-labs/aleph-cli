@@ -9,6 +9,7 @@ type ApiClient = ReturnType<typeof createApiClient>;
 
 const agentSchema = z
   .object({
+    archivedAt: z.string().nullable().optional(),
     id: z.string(),
     mode: z.string().optional(),
     name: z.string(),
@@ -176,6 +177,19 @@ export const agentsApi = {
       throwApiError(result.response, result.error, "List agent versions");
     }
     return versionsPageSchema.parse(result.data);
+  },
+
+  async unarchive(
+    client: ApiClient,
+    agentId: string
+  ): Promise<z.infer<typeof agentSchema>> {
+    const result = await client.POST("/agents/:agentId/unarchive", {
+      params: { path: { agentId } },
+    });
+    if (!result.data) {
+      throwApiError(result.response, result.error, "Unarchive agent");
+    }
+    return agentSchema.parse(result.data);
   },
 
   async update(
